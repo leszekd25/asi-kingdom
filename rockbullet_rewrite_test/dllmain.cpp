@@ -456,6 +456,8 @@ void __stdcall effect_death(int spell_index)
                         (class_pointer, spell_index, 3, (unsigned char(*)[8])some_val1, &params1, some_value1002, 25, &params0);
 
                     auto dmg = (unsigned short)ASI::GetSpellParameter(spell_data, 0);
+                    auto ratio = 100 + (100*(ASI::GetCurrentHealthMax(figuredata, figure_index)-(ASI::GetCurrentHealth(figuredata, figure_index))) / ASI::GetCurrentHealthMax(figuredata, figure_index));
+                    dmg = (dmg * ratio) / 100;
 
                     if (ASI::IsAlive(figuredata, figure_index2))
                     {
