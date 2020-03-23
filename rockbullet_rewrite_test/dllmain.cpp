@@ -149,7 +149,7 @@ void __stdcall effect_rock_bullet(int spell_index)
                         default: break;
                         }
 
-                        // MOD START
+                        // START MOD
                         auto spelljobstartnode = ASI::CallClassFunc<0x6695D0, unsigned short, unsigned short>(figuredata, figure_index);
                         while (spelljobstartnode != 0)
                         {
@@ -162,9 +162,9 @@ void __stdcall effect_rock_bullet(int spell_index)
                                 reduced_dmg = (reduced_dmg * 3) / 2;;
                                 break;
                             }
-                            spelljobstartnode = (unsigned short)ASI::Pointer(some_pointer31[spelljobstartnode*6]);
+                            spelljobstartnode = (unsigned short)ASI::Pointer((unsigned int)(some_pointer31.ptr) + spelljobstartnode * 6);
                         }
-                        // MOD END
+                        // END MOD
 
                         ASI::Pointer some_pointer2(*class_pointer[0x4]);
                         auto val17 = (unsigned int)some_pointer2[0xC];
@@ -456,8 +456,10 @@ void __stdcall effect_death(int spell_index)
                         (class_pointer, spell_index, 3, (unsigned char(*)[8])some_val1, &params1, some_value1002, 25, &params0);
 
                     auto dmg = (unsigned short)ASI::GetSpellParameter(spell_data, 0);
+                    // START MOD
                     auto ratio = 100 + (100*(ASI::GetCurrentHealthMax(figuredata, figure_index)-(ASI::GetCurrentHealth(figuredata, figure_index))) / ASI::GetCurrentHealthMax(figuredata, figure_index));
                     dmg = (dmg * ratio) / 100;
+                    // END MOD
 
                     if (ASI::IsAlive(figuredata, figure_index2))
                     {
@@ -482,6 +484,264 @@ void __stdcall effect_death(int spell_index)
     end:
         ASI::CallClassProc<0x7B9820, unsigned int, unsigned int>(class_pointer, spell_index, 0);
         return;
+}
+
+void __stdcall effect_fireburst(int spell_index)
+{
+    ASI::Pointer class_pointer;
+    __asm mov class_pointer.ptr, ecx
+
+    unsigned char some_data[12];
+    for (int i = 0; i < 12; i++)
+        some_data[i] = 0xFF;
+
+    auto spell_index_copy = spell_index;
+
+    ASI::Pointer some_pointer(class_pointer[spell_index * 27]);
+
+    auto figure_index = (unsigned short)some_pointer[0x66];
+    auto figure_offset = figure_index * 691;
+    auto figure_index2 = (unsigned short)some_pointer[0x5F];
+    auto figure_offset2 = figure_index2 * 691;
+
+    auto val3 = (unsigned char)some_pointer[0x65];
+
+    if (val3 == 1)
+    {
+        if (figure_index != 0)
+        {
+            auto figuredata = *class_pointer[0x1C];
+
+            if (ASI::IsAlive(figuredata, figure_index))
+            {
+                auto spell_id = (unsigned short)some_pointer[0x58];
+                ASI::SF_SpellData spell_data;
+                // get_spell_data
+                ASI::CallClassProc<0x5F7E30, ASI::SF_SpellData*, unsigned int>(*class_pointer[0x3C], &spell_data, spell_id);
+
+                auto val5 = (unsigned short)class_pointer[(spell_index_copy * 3 + 12) * 9];
+                unsigned short tick_count = ASI::GetXData(*class_pointer[0x50], val5, 18);
+                if (tick_count == 0)        // first ticck
+                {
+                    ASI::Pointer some_pointer1000 = *class_pointer[0x4];
+                    auto some_value1002 = (unsigned int)some_pointer1000[0xC];
+                    auto some_val1 = (unsigned char*)some_pointer[0x5E];
+                    unsigned int tmp_val1001 = 1;
+                    unsigned char params0[8]; for (int i = 0; i < 8; i++) params0[i] = 0;
+                    unsigned char params1[8]; for (int i = 0; i < 8; i++) params0[i] = 0;
+                    params1[0] = 1;
+                    *((unsigned short*)(params1 + 1)) = figure_index;
+                    // calculate_resist_chance
+                    unsigned short resist = ASI::CallClassFunc<0x7E42A0, unsigned int, unsigned int, unsigned int, unsigned int>
+                        (*class_pointer[0x2C], figure_index2, figure_index, ASI::GetSpellIndex(spell_data));
+                    // randint
+                    unsigned short rand_int = ASI::CallClassFunc<0x671C70, unsigned int, unsigned int>
+                        (*class_pointer[0x4], 100);
+
+                    if (rand_int <= resist)
+                    {
+                        ASI::CallClassProc<0x7B8AC0, unsigned int, unsigned int>
+                            (class_pointer, spell_index, figure_index);
+
+                        ASI::CallClassProc<0x7B88C0, unsigned int, unsigned int, unsigned char(*)[8], unsigned char(*)[8], unsigned int, unsigned int, unsigned char(*)[8]>
+                            (class_pointer, spell_index, 11, (unsigned char(*)[8])some_val1, &params1, some_value1002, 10, &params0);
+
+                        goto end;
+                    }
+                    else
+                    {
+                        // START MOD
+                        int dmg_mul = 0;
+                        if (ASI::HasEffectExcept(class_pointer, figure_index, 1, spell_index) != -1)
+                            dmg_mul = 1;
+                        // END MOD
+
+                        unsigned char params3[8]; for (int i = 0; i < 8; i++) params3[i] = (unsigned char)(some_pointer[0x5E+i]);
+                        unsigned char params2[8]; for (int i = 0; i < 8; i++) params2[i] = 0;
+                        ASI::CallClassProc<0x649670, unsigned char(*)[8], unsigned char(*)[8], unsigned char(*)[8]>
+                            (*class_pointer[0x44], &params2, &params3, &params1);
+
+
+                        ASI::CallClassProc<0x7B88C0, unsigned int, unsigned int, unsigned char(*)[8], unsigned char(*)[8], unsigned int, unsigned int, unsigned char(*)[8]>
+                            (class_pointer, spell_index, 3, (unsigned char(*)[8])some_val1, &params1, some_value1002, 10, &params0);
+
+
+                        ASI::CallClassProc<0x7B88C0, unsigned int, unsigned int, unsigned char(*)[8], unsigned char(*)[8], unsigned int, unsigned int, unsigned char(*)[8]>
+                            (class_pointer, spell_index, 4, (unsigned char(*)[8])some_val1, &params1, some_value1002, 25, &params0);
+
+                        auto dmg = (unsigned short)ASI::GetSpellParameter(spell_data, 0);
+
+                        ASI::AddXData(*class_pointer[0x50], val5, 18, 1);
+
+                        some_pointer[0x56].AsRef<unsigned short>() = ASI::GetSpellParameter(spell_data, 3) / 100;
+
+                        if (ASI::IsAlive(figuredata, figure_index2))
+                        {
+                            auto val16 = (unsigned char)figuredata[figure_offset2 + 0x2B4];
+                            if (val16 == 8)
+                            {
+                                // randint
+                                unsigned short rand_int2 = ASI::CallClassFunc<0x671C70, unsigned int, unsigned int>(*class_pointer[0x4], 100);
+                                if (rand_int2 <= 25)
+                                {
+                                    ASI::SetXData(*class_pointer[0x50], val5, 38, 1);
+                                    dmg *= 2;
+                                }
+                            }
+                        }
+
+                        // START MOD
+                        if (dmg_mul)
+                            dmg = (dmg * 6) / 5;
+                        // END MOD
+
+                        ASI::CallClassProc<0x7EE9C6, unsigned int, unsigned int, unsigned int, unsigned int, unsigned int, unsigned int>
+                            (*class_pointer[0x24], figure_index2, figure_index, dmg, 1, 0, 0);
+
+                        return;
+                    }
+                }
+                else
+                {
+                    ASI::Pointer some_pointer1000 = *class_pointer[0x4];
+                    auto some_value1002 = (unsigned int)some_pointer1000[0xC];
+                    auto some_val1 = (unsigned int)some_pointer[0x5E];
+
+                    unsigned char params0[8]; for (int i = 0; i < 8; i++) params0[i] = 0;
+                    unsigned char params1[8]; for (int i = 0; i < 8; i++) params0[i] = 0;
+                    params1[0] = 1;
+                    *((unsigned short*)(params1 + 1)) = figure_index;
+                    ASI::CallClassProc<0x7B88C0, unsigned int, unsigned int, unsigned char(*)[8], unsigned char(*)[8], unsigned int, unsigned int, unsigned char(*)[8]>
+                        (class_pointer, spell_index, 4, (unsigned char(*)[8])some_val1, &params1, some_value1002, 25, &params0);
+
+                    int remove_effect = 0;
+                    if (tick_count >= ASI::GetSpellParameter(spell_data, 2))
+                        remove_effect = 1;
+                    else
+                    {
+                        some_pointer[0x56].AsRef<unsigned short>() = ASI::GetSpellParameter(spell_data, 3) / 100;
+                        ASI::AddXData(*class_pointer[0x50], val5, 18, 1);
+                    }
+
+                    unsigned short cur_dmg = ASI::GetSpellParameter(spell_data, 1);
+                    unsigned short some_xdata2 = ASI::GetXData(*class_pointer[0x50], val5, 38);
+                    if (some_xdata2 == 1)
+                        cur_dmg *= 2;
+
+                    ASI::CallClassProc<0x7EE9C6, unsigned int, unsigned int, unsigned int, unsigned int, unsigned int, unsigned int>
+                        (*class_pointer[0x24], figure_index2, figure_index, cur_dmg, 1, 0, 1);
+
+                    if (remove_effect)
+                        goto end;
+                    else
+                        return;
+                }
+            }
+        }
+    }
+end:
+    ASI::CallClassProc<0x7B9820, unsigned int, unsigned int>(class_pointer, spell_index, 0);
+    return;
+}
+
+void _stdcall effect_fireshield2(int spell_index)
+{
+    ASI::Pointer class_pointer;
+    __asm mov class_pointer.ptr, ecx
+
+    unsigned char some_data[12];
+    for (int i = 0; i < 12; i++)
+        some_data[i] = 0xFF;
+
+    auto spell_index_copy = spell_index;
+
+    ASI::Pointer some_pointer(class_pointer[spell_index * 27]);
+
+    auto figure_index = (unsigned short)some_pointer[0x66];
+    auto figure_offset = figure_index * 691;
+    auto figure_index2 = (unsigned short)some_pointer[0x5F];
+    auto figure_offset2 = figure_index2 * 691;
+
+    auto val3 = (unsigned char)some_pointer[0x65];
+
+    if (val3 == 1)
+    {
+        if (figure_index != 0)
+        {
+            auto figuredata = *class_pointer[0x1C];
+
+            if (ASI::IsAlive(figuredata, figure_index))
+            {
+                auto spell_id = (unsigned short)some_pointer[0x58];
+                ASI::SF_SpellData spell_data;
+                // get_spell_data
+                ASI::CallClassProc<0x5F7E30, ASI::SF_SpellData*, unsigned int>(*class_pointer[0x3C], &spell_data, spell_id);
+
+                // calculate_resist_chance
+                unsigned short resist = ASI::CallClassFunc<0x7E42A0, unsigned int, unsigned int, unsigned int, unsigned int>
+                    (*class_pointer[0x2C], figure_index2, figure_index, ASI::GetSpellIndex(spell_data));
+                // randint
+                unsigned short rand_int = ASI::CallClassFunc<0x671C70, unsigned int, unsigned int>
+                    (*class_pointer[0x4], 100);
+
+                if (rand_int <= resist)
+                {
+                    ASI::CallClassProc<0x7B8AC0, unsigned int, unsigned int>
+                        (class_pointer, spell_index, figure_index);
+                    ASI::Pointer some_pointer1000 = *class_pointer[0x4];
+                    auto some_value1002 = (unsigned int)some_pointer1000[0xC];
+                    unsigned char some_val1[8]; for (int i = 0; i < 8; i++) some_val1[i] = 0;
+                    unsigned char params2[8]; for (int i = 0; i < 8; i++) params2[i] = 0;
+                    unsigned char params3[8]; for (int i = 0; i < 8; i++) params2[i] = 0;
+                    params3[0] = 1;
+                    *((unsigned short*)(params3 + 1)) = figure_index;
+                    ASI::CallClassProc<0x7B88C0, unsigned int, unsigned int, unsigned char(*)[8], unsigned char(*)[8], unsigned int, unsigned int, unsigned char(*)[8]>
+                        (class_pointer, spell_index, 11, &some_val1, &params3, some_value1002, 40, &params2);
+
+                    goto end;
+                }
+                else
+                {
+                    ASI::Pointer some_pointer1000 = *class_pointer[0x4];
+                    auto some_value1002 = (unsigned int)some_pointer1000[0xC];
+                    auto some_val1 = (unsigned char*)some_pointer[0x5E];
+
+                    unsigned char params0[8]; for (int i = 0; i < 8; i++) params0[i] = 0;
+                    unsigned char params1[8]; for (int i = 0; i < 8; i++) params0[i] = 0;
+                    params1[0] = 1;
+                    *((unsigned short*)(params1 + 1)) = figure_index;
+                    ASI::CallClassProc<0x7B88C0, unsigned int, unsigned int, unsigned char(*)[8], unsigned char(*)[8], unsigned int, unsigned int, unsigned char(*)[8]>
+                        (class_pointer, spell_index, 3, (unsigned char(*)[8])some_val1, &params1, some_value1002, 25, &params0);
+
+                    auto dmg = (unsigned short)ASI::GetSpellParameter(spell_data, 0);
+                    // START MOD
+                    if (ASI::HasEffect(class_pointer, figure_index, 1) != -1)
+                        dmg = (dmg * 18) / 10;
+                    // END MOD
+
+                    if (ASI::IsAlive(figuredata, figure_index2))
+                    {
+                        auto val16 = (unsigned char)figuredata[figure_offset2 + 0x2B4];
+                        if (val16 == 8)
+                        {
+                            // randint
+                            unsigned short rand_int2 = ASI::CallClassFunc<0x671C70, unsigned int, unsigned int>(*class_pointer[0x4], 100);
+                            if (rand_int2 <= 25)
+                                dmg *= 2;
+                        }
+                    }
+
+                    ASI::CallClassProc<0x7EE9C6, unsigned int, unsigned int, unsigned int, unsigned int, unsigned int, unsigned int>
+                        (*class_pointer[0x24], figure_index2, figure_index, dmg, 1, 0, 0);
+
+                    goto end;
+                }
+            }
+        }
+    }
+end:
+    ASI::CallClassProc<0x7B9820, unsigned int, unsigned int>(class_pointer, spell_index, 0);
+    return;
 }
 
 
@@ -582,10 +842,10 @@ void __stdcall spell_manager_handle_spells()
                 case ASI::SL_FIREBALL1: ASI::CallClassProc<0x7CCD30, unsigned int>(spell_manager, spell_index); break;
                 case ASI::SL_FIREBALL2: ASI::CallClassProc<0x7CD010, unsigned int>(spell_manager, spell_index); break;
                 case ASI::SL_FIREBULLET: ASI::CallClassProc<0x7CD470, unsigned int>(spell_manager, spell_index); break;
-                case ASI::SL_FIREBURST: ASI::CallClassProc<0x7CD660, unsigned int>(spell_manager, spell_index); break;
+                case ASI::SL_FIREBURST: ASI::CallAsClassProc<unsigned int>(effect_fireburst, spell_manager, spell_index); break;//ASI::CallClassProc<0x7CD660, unsigned int>(spell_manager, spell_index); break;
                 case ASI::SL_FIRE_RESISTANCE: ASI::CallClassProc<0x7CDB10, unsigned int>(spell_manager, spell_index); break;
                 case ASI::SL_FIRESHIELD1: ASI::CallClassProc<0x7CDD50, unsigned int>(spell_manager, spell_index); break;
-                case ASI::SL_FIRESHIELD2: ASI::CallClassProc<0x7CDFB0, unsigned int>(spell_manager, spell_index); break;
+                case ASI::SL_FIRESHIELD2: ASI::CallAsClassProc<unsigned int>(effect_fireshield2, spell_manager, spell_index); break;//ASI::CallClassProc<0x7CDFB0, unsigned int>(spell_manager, spell_index); break;
                 case ASI::SL_FLEXIBILITY: ASI::CallClassProc<0x7CE1A0, unsigned int>(spell_manager, spell_index); break;
                 case ASI::SL_FLEXIBILITY_AREA: ASI::CallClassProc<0x7CE400, unsigned int>(spell_manager, spell_index); break;
                 case ASI::SL_FOG: ASI::CallClassProc<0x7CE7F0, unsigned int>(spell_manager, spell_index); break;

@@ -23,6 +23,12 @@ namespace ASI
 			(xdata, xdata_unk, key, value);
 	}
 
+	inline int AddXData(ASI::Pointer xdata, unsigned int xdata_unk, unsigned char key, int value)
+	{
+		return ASI::CallClassFunc<0x7A5490, unsigned int, unsigned char, unsigned int>
+			(xdata, xdata_unk, key, value);
+	}
+
 	inline void XDataListAdd(ASI::Pointer xdatalist, unsigned int effect_index, unsigned char key, int value)
 	{
 		ASI::CallClassProc<0x81A440, unsigned int, unsigned char, int>(xdatalist, effect_index, key, value);
