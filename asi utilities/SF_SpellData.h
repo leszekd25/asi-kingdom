@@ -178,9 +178,14 @@ namespace ASI
 		unsigned char data[76];
 	};
 
-	inline unsigned int GetSpellIndex(SF_SpellData& spelldata)
+	inline unsigned short GetSpellIndex(SF_SpellData& spelldata)
 	{
-		return ((unsigned int*)spelldata.data)[0];
+		return ((unsigned short*)spelldata.data)[0];
+	}
+
+	inline unsigned short GetSpellType(SF_SpellData& spelldata)
+	{
+		return ((unsigned short*)spelldata.data)[1];
 	}
 
 	inline unsigned int GetSpellParameter(SF_SpellData& spelldata, int index)

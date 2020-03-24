@@ -151,6 +151,7 @@
     <ClInclude Include="SF_GdFigure.h" />
     <ClInclude Include="SF_SpellData.h" />
     <ClInclude Include="SF_SpellManager.h" />
+    <ClInclude Include="SF_Unknown.h" />
     <ClInclude Include="SF_XData.h" />
   </ItemGroup>
   <ItemGroup>

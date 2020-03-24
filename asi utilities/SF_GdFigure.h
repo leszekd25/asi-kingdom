@@ -23,6 +23,19 @@ namespace ASI
 			(figuredata, figure_index);
 	}
 
+	inline unsigned short GetCurrentMana(ASI::Pointer figuredata, unsigned short figure_index)
+	{
+		return ASI::CallClassFunc<0x6690F0, unsigned short, unsigned short>
+			(figuredata, figure_index);
+	}
+
+	inline unsigned short GetCurrentCharisma(ASI::Pointer figuredata, unsigned short figure_index)
+	{
+		return ASI::CallClassFunc<0x667C70, unsigned short, unsigned short>
+			(figuredata, figure_index);
+	}
+
+	// returns effect index in table if it exists, -1 otherwise
 	int HasEffect(ASI::Pointer class_pointer, unsigned short figure_index, unsigned short spellline_id)
 	{
 		auto spelljobstartnode = ASI::CallClassFunc<0x6695D0, unsigned short, unsigned short>(*class_pointer[0x1C], figure_index);
