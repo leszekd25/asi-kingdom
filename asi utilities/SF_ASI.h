@@ -32,6 +32,10 @@ namespace ASI
 		{
 			ptr = (void*)val;
 		}
+		Pointer(unsigned int val)
+		{
+			ptr = (void*)val;
+		}
 		Pointer(const Pointer& p)
 		{
 			ptr = p.ptr;
