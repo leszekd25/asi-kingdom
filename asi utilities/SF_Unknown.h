@@ -76,4 +76,9 @@ namespace ASI
 			s3 = ((unsigned short*)((unsigned int)ptr + 1))[2];
 		}
 	};
+
+	struct AreaEntityQuery
+	{
+		unsigned char data[68];
+	};
 }

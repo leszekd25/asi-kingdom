@@ -11,6 +11,12 @@ namespace ASI
 			(((unsigned int)figuredata[figure_index * 691 + 0x16] & 0xA) == 0));
 	}
 
+	inline unsigned short GetCurrentHealthPercentLeft(ASI::Pointer figuredata, unsigned short figure_index)
+	{
+		return ASI::CallClassFunc<0x5C79D0, unsigned short>
+			(figuredata[figure_index * 691 + 0x42]);
+	}
+
 	inline unsigned short GetCurrentHealth(ASI::Pointer figuredata, unsigned short figure_index)
 	{
 		return ASI::CallClassFunc<0x5C79D0, unsigned short, unsigned short>
@@ -21,6 +27,17 @@ namespace ASI
 	{
 		return ASI::CallClassFunc<0x669090, unsigned short, unsigned short>
 			(figuredata, figure_index);
+	}
+
+	inline short GetCurrentHealthMissing(ASI::Pointer figuredata, unsigned short figure_index)
+	{
+		short ret = (short)figuredata[figure_index * 691 + 0x42] + (short)figuredata[figure_index * 691 + 0x44];
+		if (ret > 0)
+			ret = (ret * (unsigned char)figuredata[figure_index * 691 + 0x46] + 100) / 100;
+		else
+			ret = 0;
+		ret -= (short)figuredata[figure_index * 691 + 0x48];
+		return GetCurrentHealthMax(figuredata, figure_index) - ret;
 	}
 
 	inline unsigned short GetCurrentMana(ASI::Pointer figuredata, unsigned short figure_index)
@@ -35,39 +52,56 @@ namespace ASI
 			(figuredata, figure_index);
 	}
 
-	// returns effect index in table if it exists, -1 otherwise
-	int HasEffect(ASI::Pointer class_pointer, unsigned short figure_index, unsigned short spellline_id)
+	inline unsigned short GetSpellJobStartNode(ASI::Pointer figuredata, unsigned short figure_index)
 	{
-		auto spelljobstartnode = ASI::CallClassFunc<0x6695D0, unsigned short, unsigned short>(*class_pointer[0x1C], figure_index);
-		while (spelljobstartnode != 0)
+		return ASI::CallClassFunc<0x6695D0, unsigned short, unsigned short>
+			(figuredata, figure_index);
+	}
+
+	inline unsigned short GetSpellJobNextNode(ASI::Pointer spelljobdata, unsigned short spelljobnode)   // [ebp+0x10]
+	{
+		return (unsigned short)ASI::Pointer((unsigned int)(spelljobdata.ptr) + spelljobnode * 6);
+	}
+
+	inline unsigned short GetSpellJobNodeSpellIndex(ASI::Pointer spelljobdata, unsigned short spelljobnode)
+	{
+		return (unsigned short)ASI::Pointer(spelljobdata[spelljobnode * 6 + 4]);
+	}
+
+	// returns effect index in table if it exists, -1 otherwise
+	int HasEffect(ASI::SF_SpellManager* spell_manager, unsigned short figure_index, unsigned short spellline_id)
+	{
+		auto spelljobnode = GetSpellJobStartNode(GetFigureManager(spell_manager), figure_index);
+		while (spelljobnode != 0)
 		{
-			ASI::Pointer some_pointer3(*class_pointer[0x10]);
+			ASI::Pointer some_pointer3(GetUnknownPointer(spell_manager, 0x10));
 			ASI::Pointer some_pointer31(*some_pointer3[0]);
-			auto some_val2 = (unsigned short)ASI::Pointer(some_pointer31[spelljobstartnode * 6 + 4]);
-			auto spell_type2 = (unsigned short)ASI::Pointer(class_pointer[some_val2 * 27 + 0x5A]);
-			if (spell_type2 == spellline_id)
-				return some_val2;
-			spelljobstartnode = (unsigned short)ASI::Pointer((unsigned int)(some_pointer31.ptr) + spelljobstartnode * 6);
+			auto spell_index = GetSpellJobNodeSpellIndex(some_pointer31, spelljobnode);
+			if(SpellType(spell_manager, spell_index) == spellline_id)
+				return spell_index;
+			spelljobnode = GetSpellJobNextNode(some_pointer31, spelljobnode);
 		}
 		return -1;
 	}
 
-	int HasEffectExcept(ASI::Pointer class_pointer, unsigned short figure_index, unsigned short spellline_id, unsigned short except_effect_id)
+	int HasEffectExcept(ASI::SF_SpellManager* spell_manager, unsigned short figure_index, unsigned short spellline_id, unsigned short except_effect_id)
 	{
-		auto spelljobstartnode = ASI::CallClassFunc<0x6695D0, unsigned short, unsigned short>(*class_pointer[0x1C], figure_index);
-		ASI::Pointer some_pointer3(*class_pointer[0x10]);
-		ASI::Pointer some_pointer31(*some_pointer3[0]);
-		while (spelljobstartnode != 0)
+		auto spelljobnode = GetSpellJobStartNode(GetFigureManager(spell_manager), figure_index);
+		while (spelljobnode != 0)
 		{
-			auto some_val2 = (unsigned short)ASI::Pointer(some_pointer31[spelljobstartnode * 6 + 4]);
-			if (some_val2 != except_effect_id)
-			{
-				auto spell_type2 = (unsigned short)ASI::Pointer(class_pointer[some_val2 * 27 + 0x5A]);
-				if (spell_type2 == spellline_id)
-					return some_val2;
-			}
-			spelljobstartnode = (unsigned short)ASI::Pointer((unsigned int)(some_pointer31.ptr) + spelljobstartnode * 6);
+			ASI::Pointer some_pointer3(GetUnknownPointer(spell_manager, 0x10));
+			ASI::Pointer some_pointer31(*some_pointer3[0]);
+			auto spell_index = GetSpellJobNodeSpellIndex(some_pointer31, spelljobnode);
+			if ((spell_index != except_effect_id) && (SpellType(spell_manager, spell_index) == spellline_id))
+				return spell_index;
+			spelljobnode = GetSpellJobNextNode(some_pointer31, spelljobnode);
 		}
 		return -1;
+	}
+
+	inline void RemoveFlags(ASI::Pointer figuredata, unsigned short figure_index, unsigned int flags)
+	{
+		ASI::CallClassProc<0x664050, unsigned short>
+			(figuredata, figure_index, flags);
 	}
 }
