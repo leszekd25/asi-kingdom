@@ -89,4 +89,19 @@ namespace ASI
 	{
 		return *((unsigned char*)(man->data + OffsetToSpell(spell_index) + 26));
 	}
+
+	inline short& SpellParamX(SF_SpellManager* man, int spell_index)
+	{
+		return *((short*)(man->data + OffsetToSpell(spell_index) + 18));
+	}
+
+	inline short& SpellParamY(SF_SpellManager* man, int spell_index)
+	{
+		return *((short*)(man->data + OffsetToSpell(spell_index) + 20));
+	}
+
+	inline unsigned int SpellParamPos(SF_SpellManager* man, int spell_index)
+	{
+		return *((unsigned int*)(man->data + OffsetToSpell(spell_index) + 18));
+	}
 }

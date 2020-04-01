@@ -13,31 +13,35 @@ namespace ASI
 
 	inline unsigned short GetCurrentHealthPercentLeft(ASI::Pointer figuredata, unsigned short figure_index)
 	{
-		return ASI::CallClassFunc<0x5C79D0, unsigned short>
+		return ASI::CallClassFunc<0x7BCFC0, unsigned short>
 			(figuredata[figure_index * 691 + 0x42]);
 	}
 
-	inline unsigned short GetCurrentHealth(ASI::Pointer figuredata, unsigned short figure_index)
+	inline short GetCurrentHealth(ASI::Pointer figuredata, unsigned short figure_index)
 	{
-		return ASI::CallClassFunc<0x5C79D0, unsigned short, unsigned short>
+		return ASI::CallClassFunc<0x5C79D0, short, unsigned short>
 			(figuredata, figure_index);
 	}
 
-	inline unsigned short GetCurrentHealthMax(ASI::Pointer figuredata, unsigned short figure_index)
+	inline short GetCurrentHealthMax(ASI::Pointer figuredata, unsigned short figure_index)
 	{
-		return ASI::CallClassFunc<0x669090, unsigned short, unsigned short>
+		return ASI::CallClassFunc<0x669090, short, unsigned short>
 			(figuredata, figure_index);
 	}
 
 	inline short GetCurrentHealthMissing(ASI::Pointer figuredata, unsigned short figure_index)
 	{
-		short ret = (short)figuredata[figure_index * 691 + 0x42] + (short)figuredata[figure_index * 691 + 0x44];
-		if (ret > 0)
-			ret = (ret * (unsigned char)figuredata[figure_index * 691 + 0x46] + 100) / 100;
-		else
-			ret = 0;
-		ret -= (short)figuredata[figure_index * 691 + 0x48];
-		return GetCurrentHealthMax(figuredata, figure_index) - ret;
+		return GetCurrentHealthMax(figuredata, figure_index) - GetCurrentHealth(figuredata, figure_index);
+	}
+
+	inline unsigned short GetLifeAction(ASI::Pointer figuredata, unsigned short figure_index)
+	{
+		return (unsigned short)(figuredata[figure_index * 691 + 0x48]);
+	}
+
+	inline unsigned char GetRace(ASI::Pointer figuredata, unsigned short figure_index)
+	{
+		return (unsigned char)(figuredata[figure_index * 691 + 0x1A]);
 	}
 
 	inline unsigned short GetCurrentMana(ASI::Pointer figuredata, unsigned short figure_index)
