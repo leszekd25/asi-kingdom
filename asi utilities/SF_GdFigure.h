@@ -39,9 +39,19 @@ namespace ASI
 		return (unsigned short)(figuredata[figure_index * 691 + 0x48]);
 	}
 
+	inline unsigned int& GetFlags(ASI::Pointer figuredata, unsigned short figure_index)
+	{
+		return *((unsigned int*)(figuredata + figure_index * 691 + 0x16));
+	}
+
 	inline unsigned char GetRace(ASI::Pointer figuredata, unsigned short figure_index)
 	{
 		return (unsigned char)(figuredata[figure_index * 691 + 0x1A]);
+	}
+
+	inline unsigned char GetLevel(ASI::Pointer figuredata, unsigned short figure_index)
+	{
+		return (unsigned char)(figuredata[figure_index * 691 + 0x1B]);
 	}
 
 	inline unsigned short GetCurrentMana(ASI::Pointer figuredata, unsigned short figure_index)
@@ -53,6 +63,12 @@ namespace ASI
 	inline unsigned short GetCurrentCharisma(ASI::Pointer figuredata, unsigned short figure_index)
 	{
 		return ASI::CallClassFunc<0x667C70, unsigned short, unsigned short>
+			(figuredata, figure_index);
+	}
+
+	inline unsigned short GetCurrentIntelligence(ASI::Pointer figuredata, unsigned short figure_index)
+	{
+		return ASI::CallClassFunc<0x668F90, unsigned short, unsigned short>
 			(figuredata, figure_index);
 	}
 

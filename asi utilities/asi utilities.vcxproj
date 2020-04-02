@@ -148,6 +148,7 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClInclude Include="SF_ASI.h" />
+    <ClInclude Include="SF_GdEffect.h" />
     <ClInclude Include="SF_GdFigure.h" />
     <ClInclude Include="SF_SpellData.h" />
     <ClInclude Include="SF_SpellManager.h" />

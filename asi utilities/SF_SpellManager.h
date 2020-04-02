@@ -55,6 +55,16 @@ namespace ASI
 		);
 	}
 
+	inline SF_Unk1 GetUnk2(SF_SpellManager* man, int spell_index)
+	{
+		return SF_Unk1(
+			(*((unsigned char*)(man->data + OffsetToSpell(spell_index) + 15))),
+			(*((unsigned short*)(man->data + OffsetToSpell(spell_index) + 16))),
+			(*((unsigned short*)(man->data + OffsetToSpell(spell_index) + 18))),
+			(*((unsigned short*)(man->data + OffsetToSpell(spell_index) + 20)))
+		);
+	}
+
 	inline short& SpellToDoCount(SF_SpellManager* man, int spell_index)
 	{
 		return *((short*)(man->data + OffsetToSpell(spell_index) + 0));

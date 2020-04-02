@@ -5,6 +5,13 @@ inline int ABS(int x) {
 	return x > 0 ? x : -x;
 }
 
+inline int CLAMP(int v1, int v2, int t1, int t2, int t)
+{
+	return (t > t2 ? v2 : 
+		   (t < t1 ? v1 : 
+		   (v1 + (((((t - t1) * 100) / (t2 - t1)) * (v2 - v1)) / 100))));
+}
+
 
 namespace ASI
 {
