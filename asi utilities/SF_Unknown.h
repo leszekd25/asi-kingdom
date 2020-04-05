@@ -5,6 +5,16 @@ inline int ABS(int x) {
 	return x > 0 ? x : -x;
 }
 
+inline int MAX(int x, int y)
+{
+	return x > y ? x : y;
+}
+
+inline int MIN(int x, int y)
+{
+	return x < y ? x : y;
+}
+
 inline int CLAMP(int v1, int v2, int t1, int t2, int t)
 {
 	return (t > t2 ? v2 : 
@@ -30,6 +40,26 @@ namespace ASI
 			other_data[1] = ((unsigned char*)(ptr))[5];
 			other_data[2] = ((unsigned char*)(ptr))[6];
 			other_data[3] = ((unsigned char*)(ptr))[7];
+		}
+
+		inline SF_PositionQuery(unsigned int pos)
+		{
+			x = pos & 0xFFFF;
+			y = pos >> 16;
+			other_data[0] = 0;
+			other_data[1] = 0;
+			other_data[2] = 0;
+			other_data[3] = 0;
+		}
+
+		inline SF_PositionQuery(unsigned short _x, unsigned short _y)
+		{
+			x = _x;
+			y = _y;
+			other_data[0] = 0;
+			other_data[1] = 0;
+			other_data[2] = 0;
+			other_data[3] = 0;
 		}
 	};
 

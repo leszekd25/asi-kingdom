@@ -15,6 +15,11 @@ namespace ASI
 		return 27 * spell_index + 86;
 	}
 
+	inline ASI::Pointer GetBuildingManager(SF_SpellManager* man)
+	{
+		return (ASI::Pointer(((unsigned int*)(man->data))[2]));
+	}
+
 	inline ASI::Pointer GetFigureManager(SF_SpellManager* man)
 	{
 		return (ASI::Pointer(((unsigned int*)(man->data))[7]));
@@ -85,6 +90,11 @@ namespace ASI
 		return *((unsigned short*)(man->data + OffsetToSpell(spell_index) + 6));
 	}
 
+	inline unsigned char& SpellParam3(SF_SpellManager* man, int spell_index)
+	{
+		return *((unsigned char*)(man->data + OffsetToSpell(spell_index) + 8));
+	}
+
 	inline unsigned char& SpellParam4(SF_SpellManager* man, int spell_index)
 	{
 		return *((unsigned char*)(man->data + OffsetToSpell(spell_index) + 15));
@@ -95,7 +105,7 @@ namespace ASI
 		return *((unsigned short*)(man->data + OffsetToSpell(spell_index) + 22));
 	}
 
-	inline unsigned char& SpellParam6(SF_SpellManager* man, int spell_index)
+	inline unsigned char& SpellFlags(SF_SpellManager* man, int spell_index)
 	{
 		return *((unsigned char*)(man->data + OffsetToSpell(spell_index) + 26));
 	}

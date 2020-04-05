@@ -64,6 +64,14 @@ namespace ASI
 		{
 			return Pointer((int)(*(void**)ptr));
 		}
+		inline bool operator==(Pointer p)
+		{
+			return ptr == p.ptr;
+		}
+		inline bool operator!=(Pointer p)
+		{
+			return ptr != p.ptr;
+		}
 		template<class T>
 		inline T& AsRef()
 		{
@@ -102,6 +110,18 @@ namespace ASI
 	inline Result CallGlobalFunc(Args... vals)
 	{
 		return ((Result(__stdcall*)(Args...))(Addr))(vals...);
+	}
+
+	template<unsigned int Addr, typename ... Args>
+	inline void CallGlobalCDeclProc(Args... vals)
+	{
+		((void(__cdecl*)(Args...))(Addr))(vals...);
+	}
+
+	template<unsigned int Addr, typename Result, typename ... Args>
+	inline Result CallGlobalCDeclFunc(Args... vals)
+	{
+		return ((Result(__cdecl*)(Args...))(Addr))(vals...);
 	}
 
 	template<unsigned int Addr, typename ... Args>

@@ -39,9 +39,24 @@ namespace ASI
 		return (unsigned short)(figuredata[figure_index * 691 + 0x48]);
 	}
 
+	inline unsigned int GetPosition(ASI::Pointer figuredata, unsigned short figure_index)
+	{
+		return (unsigned int)(figuredata[figure_index * 691 + 0x2]);
+	}
+
+	inline unsigned short GetX(ASI::Pointer figuredata, unsigned short figure_index)
+	{
+		return (unsigned int)(figuredata[figure_index * 691 + 0x2]);
+	}
+
+	inline unsigned short GetY(ASI::Pointer figuredata, unsigned short figure_index)
+	{
+		return (unsigned int)(figuredata[figure_index * 691 + 0x4]);
+	}
+
 	inline unsigned int& GetFlags(ASI::Pointer figuredata, unsigned short figure_index)
 	{
-		return *((unsigned int*)(figuredata + figure_index * 691 + 0x16));
+		return *((unsigned int*)((unsigned int)figuredata.ptr + figure_index * 691 + 0x16));
 	}
 
 	inline unsigned char GetRace(ASI::Pointer figuredata, unsigned short figure_index)
@@ -54,6 +69,21 @@ namespace ASI
 		return (unsigned char)(figuredata[figure_index * 691 + 0x1B]);
 	}
 
+	inline unsigned short GetFigureID(ASI::Pointer figuredata, unsigned short figure_index)
+	{
+		return (unsigned short)(figuredata[figure_index * 691 + 0x28]);
+	}
+
+	inline unsigned short GetBuilding(ASI::Pointer figuredata, unsigned short figure_index)
+	{
+		return (unsigned short)(figuredata[figure_index * 691 + 0x14]);
+	}
+
+	inline short GetInUse(ASI::Pointer figuredata, unsigned short figure_index)
+	{
+		return (short)(figuredata[figure_index * 691 + 0x1C]);
+	}
+
 	inline unsigned short GetCurrentMana(ASI::Pointer figuredata, unsigned short figure_index)
 	{
 		return ASI::CallClassFunc<0x6690F0, unsigned short, unsigned short>
@@ -63,6 +93,12 @@ namespace ASI
 	inline unsigned short GetCurrentCharisma(ASI::Pointer figuredata, unsigned short figure_index)
 	{
 		return ASI::CallClassFunc<0x667C70, unsigned short, unsigned short>
+			(figuredata, figure_index);
+	}
+
+	inline unsigned short GetCurrentManaMax(ASI::Pointer figuredata, unsigned short figure_index)
+	{
+		return ASI::CallClassFunc<0x669160, unsigned short, unsigned short>
 			(figuredata, figure_index);
 	}
 
@@ -117,6 +153,35 @@ namespace ASI
 			spelljobnode = GetSpellJobNextNode(some_pointer31, spelljobnode);
 		}
 		return -1;
+	}
+
+	inline int CheckCompatibleTargets(ASI::SF_SpellManager* spell_manager, ASI::Pointer figuredata, unsigned short figure_index1, unsigned short figure_index2, int target_type)
+	{
+		if (target_type == 1)
+		{
+			if (ASI::CallClassFunc<0x7FA9DD, int, unsigned short, unsigned short>
+				(ASI::GetUnknownPointer(spell_manager, 0x24), figure_index1, figure_index2) != 0)
+				return 0;
+
+			if (ASI::GetInUse(figuredata, figure_index1) != ASI::GetInUse(figuredata, figure_index2))
+				return 0;
+		}
+		else if (target_type == 2)
+		{
+			if (ASI::CallClassFunc<0x7FA9DD, int, unsigned short, unsigned short>
+				(ASI::GetUnknownPointer(spell_manager, 0x24), figure_index1, figure_index2) == 0)
+				return 0;
+
+			if (ASI::CallClassFunc<0x7FA8F9, int, unsigned short>
+				(ASI::GetUnknownPointer(spell_manager, 0x24), figure_index2) == 0)
+				return 0;
+		}
+		else if (target_type == 3)
+			return 1;
+		else
+			return 0;
+
+		return 1;
 	}
 
 	inline void RemoveFlags(ASI::Pointer figuredata, unsigned short figure_index, unsigned int flags)
