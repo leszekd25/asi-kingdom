@@ -2520,27 +2520,6 @@ void __stdcall effect_aura(int spell_index)
                             {
                                 if (ASI::CheckCompatibleTargets(spell_manager, figuredata, figure_index2, figure_index3, ASI::GetSpellParameter(spell_data, 5)) == 0)
                                     continue;
-                                /*if (ASI::GetSpellParameter(spell_data, 5) == 1)
-                                {
-                                    if (ASI::CallClassFunc<0x7FA9DD, int, unsigned short, unsigned short>
-                                        (ASI::GetUnknownPointer(spell_manager, 0x24), figure_index2, figure_index3) != 0)
-                                        continue;
-
-                                    if (ASI::GetInUse(figuredata, figure_index2) != ASI::GetInUse(figuredata, figure_index3))
-                                        continue;
-                                }
-                                else if (ASI::GetSpellParameter(spell_data, 5) == 2)
-                                {
-                                    if (ASI::CallClassFunc<0x7FA9DD, int, unsigned short, unsigned short>
-                                        (ASI::GetUnknownPointer(spell_manager, 0x24), figure_index2, figure_index3) == 0)
-                                        continue;
-
-                                    if (ASI::CallClassFunc<0x7FA8F9, int, unsigned short>
-                                        (ASI::GetUnknownPointer(spell_manager, 0x24), figure_index3) == 0)
-                                        continue;
-                                }
-                                else
-                                    continue;*/
 
                                 switch (spell_type)
                                 {
@@ -3395,6 +3374,176 @@ void __stdcall effect_chill_resistance(int spell_index)
     ASI::GdEffect_Remove(spell_manager, spell_index);
 }
 
+void __stdcall effect_confuse(int spell_index)
+{
+    ASI::SF_SpellManager* spell_manager;
+    __asm mov spell_manager, ecx
+
+    unsigned char some_data[12];
+    for (int i = 0; i < 12; i++)
+        some_data[i] = 0xFF;
+
+    auto figure_index = ASI::SpellTarget(spell_manager, spell_index);
+    auto figure_index2 = ASI::SpellSource(spell_manager, spell_index);
+
+    if (ASI::SpellParam4(spell_manager, spell_index) == 1)
+    {
+        if (figure_index != 0)
+        {
+            auto figuredata = ASI::GetFigureManager(spell_manager);
+
+            if (ASI::IsAlive(figuredata, figure_index))
+            {
+                if (ASI::CallClassFunc<0x7FA9DD, int, unsigned short, unsigned short>
+                    (ASI::GetUnknownPointer(spell_manager, 0x24), figure_index2, figure_index) != 0)
+                {
+                    auto spell_id = ASI::SpellID(spell_manager, spell_index);
+                    ASI::SF_SpellData spell_data;
+                    // get_spell_data
+                    ASI::CallClassProc<0x5F7E30, ASI::SF_SpellData*, unsigned int>(ASI::GetUnknownPointer(spell_manager, 0x3C), &spell_data, spell_id);
+
+                    auto val5 = ASI::SpellXData(spell_manager, spell_index);
+                    if (ASI::AddXData(ASI::GetXDataPointer(spell_manager), val5, 5, 1) == 1)
+                    {
+                        // draw aggro
+                        ASI::CallClassProc<0x7B8AC0, unsigned int, unsigned int>
+                            (spell_manager->data, spell_index, figure_index);
+                        // calculate_resist_chance
+                        unsigned short resist = ASI::CallClassFunc<0x7E42A0, unsigned int, unsigned int, unsigned int, unsigned int>
+                            (ASI::GetUnknownPointer(spell_manager, 0x2C), figure_index2, figure_index, ASI::GetSpellIndex(spell_data));
+                        // randint
+                        unsigned short rand_int = ASI::CallClassFunc<0x671C70, unsigned int, unsigned int>
+                            (ASI::GetUnknownPointer(spell_manager, 0x4), 100);
+
+                        if (rand_int <= resist)
+                        {
+                            ASI::GdEffect_VisualOnlyAdd(spell_manager, spell_index, 11, 1, figure_index, 0, 0, 10, ASI::SF_Unk1());
+                        }
+                        else
+                        {
+                            if (ASI::CallClassFunc<0x7B8E60, int, int>
+                                (spell_manager->data, spell_index) != 0)
+                            {
+                                ASI::GetFlags(figuredata, figure_index) |= 0x60;
+                                ASI::SpellFlags(spell_manager, spell_index) |= 0x6;
+                                auto charisma = ASI::GetCurrentCharisma(figuredata, figure_index);
+                                auto duration = (charisma + 15) * (ASI::GetSpellParameter(spell_data, 0)) / 50;
+                                ASI::SpellToDoCount(spell_manager, spell_index) += duration / 100;
+
+                                ASI::GdEffect_VisualOnlyAdd(spell_manager, spell_index, 3, 1, figure_index, 0, 0, ASI::SpellToDoCount(spell_manager, spell_index), ASI::SF_Unk1());
+                                return;
+                            }
+                        }
+                    }
+                    else
+                    {
+                        ASI::SpellFlags(spell_manager, spell_index) &= 0xFD;
+
+                        ASI::SF_Unk1 unk = ASI::GetUnk2(spell_manager, spell_index);
+                        if (unk.c1 == 1)
+                        {
+                            auto spelljobnode = ASI::GetSpellJobStartNode(figuredata, unk.s1);
+                            if (spelljobnode != 0)
+                            {
+                                while (true)
+                                {
+                                    ASI::Pointer some_pointer3(ASI::GetUnknownPointer(spell_manager, 0x10));
+                                    ASI::Pointer some_pointer31(*some_pointer3[0]);
+
+                                    if (ASI::GetSpellJobNodeSpellIndex(some_pointer31, spelljobnode) != spell_index)
+                                    {
+                                        if ((ASI::SpellFlags(spell_manager, ASI::GetSpellJobNodeSpellIndex(some_pointer31, spelljobnode)) & 2) != 0)
+                                            break;
+                                    }
+
+                                    spelljobnode = ASI::GetSpellJobNextNode(some_pointer31, spelljobnode);
+                                    if (spelljobnode == 0)
+                                    {
+                                        ASI::RemoveFlags(figuredata, figure_index2, 0x20);
+                                        break;
+                                    }
+                                }
+                            }
+                            else
+                                ASI::RemoveFlags(figuredata, figure_index2, 0x20);
+                        }
+
+                        ASI::CallClassProc<0x7B95D0, unsigned int, unsigned int*>(spell_manager->data, spell_index, 0);
+                    }
+                }
+            }
+        }
+    }
+
+    ASI::GdEffect_Remove(spell_manager, spell_index);
+}
+
+void __stdcall effect_dark_banishing(int spell_index)
+{
+    ASI::SF_SpellManager* spell_manager;
+    __asm mov spell_manager, ecx
+
+    unsigned char some_data[12];
+    for (int i = 0; i < 12; i++)
+        some_data[i] = 0xFF;
+
+    auto figure_index = ASI::SpellTarget(spell_manager, spell_index);
+    auto figure_index2 = ASI::SpellSource(spell_manager, spell_index);
+
+    if (ASI::SpellParam4(spell_manager, spell_index) == 1)
+    {
+        if (figure_index != 0)
+        {
+            auto figuredata = ASI::GetFigureManager(spell_manager);
+
+            if (ASI::IsAlive(figuredata, figure_index))
+            {
+                auto spell_id = ASI::SpellID(spell_manager, spell_index);
+                ASI::SF_SpellData spell_data;
+                // get_spell_data
+                ASI::CallClassProc<0x5F7E30, ASI::SF_SpellData*, unsigned int>(ASI::GetUnknownPointer(spell_manager, 0x3C), &spell_data, spell_id);
+
+                auto val5 = ASI::SpellXData(spell_manager, spell_index);
+                if (ASI::GetXData(ASI::GetXDataPointer(spell_manager), val5, 5) == 0)
+                {
+                    // calculate_resist_chance
+                    unsigned short resist = ASI::CallClassFunc<0x7E42A0, unsigned int, unsigned int, unsigned int, unsigned int>
+                        (ASI::GetUnknownPointer(spell_manager, 0x2C), figure_index2, figure_index, ASI::GetSpellIndex(spell_data));
+                    // randint
+                    unsigned short rand_int = ASI::CallClassFunc<0x671C70, unsigned int, unsigned int>
+                        (ASI::GetUnknownPointer(spell_manager, 0x4), 100);
+
+                    if (rand_int <= resist)
+                    {
+                        ASI::GdEffect_VisualOnlyAdd(spell_manager, spell_index, 11, 1, figure_index, 0, 0, 10, ASI::SF_Unk1());
+                    }
+                    else
+                    {
+                        if (ASI::CallClassFunc<0x7B8E60, int, int>
+                            (spell_manager->data, spell_index) != 0)
+                        {
+                            ASI::GdEffect_VisualOnlyAdd(spell_manager, spell_index, 3, 1, figure_index, 0, 0, ASI::GetSpellParameter(spell_data, 1) / 100, ASI::SF_Unk1());
+                            ASI::SpellToDoCount(spell_manager, spell_index) = ASI::GetSpellParameter(spell_data, 1) / 100;
+                            ASI::AddXData(ASI::GetXDataPointer(spell_manager), val5, 5, 1);
+                            ASI::CallClassProc<0x7B8AC0, unsigned int, unsigned int>
+                                (spell_manager->data, spell_index, figure_index);
+
+                            ASI::CallClassProc<0x66B290, unsigned short, char>(figuredata, figure_index, -ASI::GetSpellParameter(spell_data, 0));
+                            return;
+                        }
+                    }
+                }
+                else
+                {
+                    ASI::CallClassProc<0x66B290, unsigned short, char>(figuredata, figure_index, ASI::GetSpellParameter(spell_data, 0));
+                }
+            }
+        }
+    }
+
+    ASI::GdEffect_Remove(spell_manager, spell_index);
+}
+
 void __stdcall effect_death(int spell_index)
 {
     ASI::SF_SpellManager* spell_manager;
@@ -3444,10 +3593,6 @@ void __stdcall effect_death(int spell_index)
                     ASI::GdEffect_VisualOnlyAdd(spell_manager, spell_index, 3, 1, figure_index, 0, 0, 25, ASI::SF_Unk1());
 
                     auto dmg = (unsigned short)ASI::GetSpellParameter(spell_data, 0);
-                    // START MOD
-                    auto ratio = 100 + (100 - ASI::GetCurrentHealthPercentLeft(figuredata, figure_index));
-                    dmg = (dmg * ratio) / 100;
-                    // END MOD
 
                     if (ASI::IsAlive(figuredata, figure_index2))
                     {
@@ -3469,6 +3614,77 @@ void __stdcall effect_death(int spell_index)
     }
 
     ASI::GdEffect_Remove(spell_manager, spell_index);
+}
+
+void __stdcall effect_decay(int spell_index)
+{
+    ASI::SF_SpellManager* spell_manager;
+    __asm mov spell_manager, ecx
+
+    unsigned char some_data[12];
+    for (int i = 0; i < 12; i++)
+        some_data[i] = 0xFF;
+
+    auto figure_index = ASI::SpellTarget(spell_manager, spell_index);
+    auto figure_index2 = ASI::SpellSource(spell_manager, spell_index);
+
+    if (ASI::SpellParam4(spell_manager, spell_index) == 1)
+    {
+        if (figure_index != 0)
+        {
+            auto figuredata = ASI::GetFigureManager(spell_manager);
+
+            if (ASI::IsAlive(figuredata, figure_index))
+            {
+                auto spell_id = ASI::SpellID(spell_manager, spell_index);
+                ASI::SF_SpellData spell_data;
+                // get_spell_data
+                ASI::CallClassProc<0x5F7E30, ASI::SF_SpellData*, unsigned int>(ASI::GetUnknownPointer(spell_manager, 0x3C), &spell_data, spell_id);
+
+                auto val5 = ASI::SpellXData(spell_manager, spell_index);
+                if (ASI::AddXData(ASI::GetXDataPointer(spell_manager), val5, 5, 1) == 1)
+                {
+                    // calculate_resist_chance
+                    unsigned short resist = ASI::CallClassFunc<0x7E42A0, unsigned int, unsigned int, unsigned int, unsigned int>
+                        (ASI::GetUnknownPointer(spell_manager, 0x2C), figure_index2, figure_index, ASI::GetSpellIndex(spell_data));
+                    // randint
+                    unsigned short rand_int = ASI::CallClassFunc<0x671C70, unsigned int, unsigned int>
+                        (ASI::GetUnknownPointer(spell_manager, 0x4), 100);
+
+                    if (rand_int <= resist)
+                    {
+                        ASI::GdEffect_VisualOnlyAdd(spell_manager, spell_index, 11, 1, figure_index, 0, 0, 25, ASI::SF_Unk1());
+                    }
+                    else
+                    {
+                        if (ASI::CallClassFunc<0x7B8E60, int, int>
+                            (spell_manager->data, spell_index) != 0)
+                        {
+                            short duration = (ASI::GetSpellParameter(spell_data, 0) * ASI::GetSpellParameter(spell_data, 1)) / 100;
+                            ASI::GdEffect_VisualOnlyAdd(spell_manager, spell_index, 3, 1, figure_index, 0, 0, duration, ASI::SF_Unk1());
+                            ASI::SpellToDoCount(spell_manager, spell_index) = duration;
+                            ASI::CallClassProc<0x7B8AC0, unsigned int, unsigned int>
+                                (spell_manager->data, spell_index, figure_index);
+
+                            ASI::CallClassProc<0x66AE70, unsigned short, char>(figuredata, figure_index, -ASI::GetSpellParameter(spell_data, 2));
+                            return;
+                        }
+                    }
+                }
+                else
+                {
+                    ASI::CallClassProc<0x66AE70, unsigned short, char>(figuredata, figure_index, ASI::GetSpellParameter(spell_data, 2));
+                }
+            }
+        }
+    }
+
+    ASI::GdEffect_Remove(spell_manager, spell_index);
+}
+
+void __stdcall effect_demoralization(int spell_index)
+{
+
 }
 
 void __stdcall effect_fireburst(int spell_index)
@@ -3524,12 +3740,6 @@ void __stdcall effect_fireburst(int spell_index)
                     }
                     else
                     {
-                        // START MOD
-                        int dmg_mul = 0;
-                        if (ASI::HasEffectExcept(spell_manager, figure_index, 1, spell_index) != -1)
-                            dmg_mul = 1;
-                        // END MOD
-
                         ASI::SF_Unk1 params1(1, figure_index, 0, 0);
                         ASI::SF_Unk1 params3 = ASI::GetUnk1(spell_manager, spell_index);
                         ASI::SF_Unk1 params2;
@@ -3559,11 +3769,6 @@ void __stdcall effect_fireburst(int spell_index)
                                 }
                             }
                         }
-
-                        // START MOD
-                        if (dmg_mul)
-                            dmg = (dmg * 6) / 5;
-                        // END MOD
 
                         ASI::CallClassProc<0x7EE9C6, unsigned int, unsigned int, unsigned int, unsigned int, unsigned int, unsigned int>
                             (ASI::GetUnknownPointer(spell_manager, 0x24), figure_index2, figure_index, dmg, 1, 0, 0);
@@ -3655,10 +3860,6 @@ void _stdcall effect_fireshield2(int spell_index)
                     ASI::GdEffect_VisualOnlyAdd(spell_manager, spell_index, 3, 1, figure_index, 0, 0, 25, ASI::SF_Unk1());
 
                     auto dmg = (unsigned short)ASI::GetSpellParameter(spell_data, 0);
-                    // START MOD
-                    if (ASI::HasEffect(spell_manager, figure_index, 1) != -1)
-                        dmg = (dmg * 18) / 10;
-                    // END MOD
 
                     if (ASI::IsAlive(figuredata, figure_index2))
                     {
@@ -3739,21 +3940,6 @@ void __stdcall effect_healing(int spell_index)
                     short neg_heal = -heal;
                     ASI::CallClassProc<0x66B230, unsigned short, short>(figuredata, figure_index, neg_heal);
                 }
-                // START MOD
-                else
-                {
-                    //ASI::Pointer some_pointer2(class_pointer[remediless_index * 27]);
-                    auto remediless_id = ASI::SpellID(spell_manager, remediless_index);
-                    ASI::SF_SpellData remediless_spell_data;
-                    // get_spell_data
-                    ASI::CallClassProc<0x5F7E30, ASI::SF_SpellData*, unsigned int>(ASI::GetUnknownPointer(spell_manager, 0x3C), &remediless_spell_data, remediless_id);
-
-                    auto reflect_back = (heal * ASI::GetSpellParameter(remediless_spell_data, 1)) / 100;
-                    ASI::CallClassProc<0x7EE9C6, unsigned int, unsigned int, unsigned int, unsigned int, unsigned int, unsigned int>
-                        (ASI::GetUnknownPointer(spell_manager, 0x24), figure_index, ASI::SpellTarget(spell_manager, remediless_index), reflect_back, 1, 0, 0);   // THIS COULD CRASH THE GAME POTENTIALLY
-                }
-
-                // END MOD
             }
         }
     }
@@ -3867,18 +4053,7 @@ void __stdcall effect_icestrike1(int spell_index)
                 }
                 else
                 {
-                    // START MOD
-                    ASI::SpellFlags(spell_manager, spell_index) &= 0xFD;
-                    unsigned int some_val1003 = ASI::SpellParam4(spell_manager, spell_index);
-                    ASI::CallClassProc<0x7B9550, unsigned int, unsigned int*>(spell_manager->data, spell_index, &some_val1003);
-                    ASI::CallClassProc<0x7B9660, unsigned int, unsigned int*>(spell_manager->data, spell_index, 0);
-
-                    goto end;
-                    // END MOD
-
-                    // MOD START
-
-                    /*ASI::Pointer some_pointer1000 = ASI::GetUnknownPointer(spell_manager, 0x4);
+                    ASI::Pointer some_pointer1000 = ASI::GetUnknownPointer(spell_manager, 0x4);
                     auto some_value1002 = (unsigned int)some_pointer1000[0xC];
                     ASI::SF_Unk1 some_val1 = ASI::GetUnk1(spell_manager, spell_index);
                     ASI::SF_Unk1 params0;
@@ -3914,9 +4089,7 @@ void __stdcall effect_icestrike1(int spell_index)
                     if (remove_effect_01 == 1)
                         goto end;
                     else
-                        return;*/
-
-                        // MOD END
+                        return;
                 }
             }
         }
@@ -4123,23 +4296,6 @@ void __stdcall effect_rock_bullet(int spell_index)
                         default: break;
                         }
 
-                        // START MOD
-                        auto spelljobstartnode = ASI::GetSpellJobStartNode(figuredata, figure_index);
-                        while (spelljobstartnode != 0)
-                        {
-                            ASI::Pointer some_pointer3(ASI::GetUnknownPointer(spell_manager, 0x10));
-                            ASI::Pointer some_pointer31(*some_pointer3[0]);
-                            auto some_val2 = ASI::GetSpellJobNodeSpellIndex(some_pointer31, spelljobstartnode);// (unsigned short)ASI::Pointer(some_pointer31[spelljobstartnode * 6 + 4]);
-                            auto spell_type2 = ASI::SpellType(spell_manager, some_val2);
-                            if ((spell_type2 == 16) || (spell_type2 == 17))
-                            {
-                                reduced_dmg = (reduced_dmg * 3) / 2;;
-                                break;
-                            }
-                            spelljobstartnode = ASI::GetSpellJobNextNode(some_pointer31, spelljobstartnode);// (unsigned short)ASI::Pointer((unsigned int)(some_pointer31.ptr) + spelljobstartnode * 6);
-                        }
-                        // END MOD
-
                         //GdEffect::Add
                         unsigned int result = ASI::GdEffect_Add(spell_manager, spell_index, 3, 1, figure_index, 0, 0, val15, some_val1, ASI::SF_Unk1());
                             
@@ -4307,7 +4463,7 @@ void __stdcall spell_manager_handle_spells()
                 case ASI::SL_MUTATION: ASI::CallClassProc<0x7D5A70, unsigned int>(spell_manager, spell_index); break;
                 case ASI::SL_PAIN: ASI::CallClassProc<0x7D6720, unsigned int>(spell_manager, spell_index); break;
                 case ASI::SL_PAIN_AREA: ASI::CallClassProc<0x7D6990, unsigned int>(spell_manager, spell_index); break;
-                case ASI::SL_UNKNOWN3: ASI::CallClassProc<0x7D6DD0, unsigned int>(spell_manager, spell_index); break;
+                case ASI::SL_PAIN_TOWER: ASI::CallClassProc<0x7D6DD0, unsigned int>(spell_manager, spell_index); break;
                 case ASI::SL_PESTILENCE: ASI::CallClassProc<0x7D6FE0, unsigned int>(spell_manager, spell_index); break;
                 case ASI::SL_PETRIFY: ASI::CallAsClassProc<unsigned int>(effect_petrify, spell_manager, spell_index); break;//ASI::CallClassProc<0x7D7420, unsigned int>(spell_manager, spell_index); break;
                 case ASI::SL_PLAGUE_AREA: ASI::CallClassProc<0x7D7740, unsigned int>(spell_manager, spell_index); break;

@@ -25,6 +25,11 @@ namespace ASI
 		return (ASI::Pointer(((unsigned int*)(man->data))[7]));
 	}
 
+	inline ASI::Pointer GetObjectManager(SF_SpellManager* man)
+	{
+		return (ASI::Pointer(((unsigned int*)(man->data))[12]));
+	}
+
 	inline ASI::Pointer GetXDataPointer(SF_SpellManager* man)
 	{
 		return (ASI::Pointer(((unsigned int*)(man->data))[20]));
@@ -120,7 +125,7 @@ namespace ASI
 		return *((short*)(man->data + OffsetToSpell(spell_index) + 20));
 	}
 
-	inline unsigned int SpellParamPos(SF_SpellManager* man, int spell_index)
+	inline unsigned int& SpellParamPos(SF_SpellManager* man, int spell_index)
 	{
 		return *((unsigned int*)(man->data + OffsetToSpell(spell_index) + 18));
 	}
