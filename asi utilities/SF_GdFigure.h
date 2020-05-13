@@ -108,10 +108,21 @@ namespace ASI
 			(figuredata, figure_index);
 	}
 
+	inline void ReduceCurrentMana(ASI::Pointer figuredata, unsigned short figure_index, short mana)
+	{
+		ASI::CallClassProc<0x66B260, unsigned short, short>
+			(figuredata, figure_index, mana);
+	}
+
 	inline unsigned short GetSpellJobStartNode(ASI::Pointer figuredata, unsigned short figure_index)
 	{
 		return ASI::CallClassFunc<0x6695D0, unsigned short, unsigned short>
 			(figuredata, figure_index);
+	}
+
+	inline void DealDamageUnconditional(ASI::Pointer figuredata, unsigned short figure_index, short damage)
+	{
+		ASI::CallClassProc<0x66B230, unsigned short, short>(figuredata, figure_index, damage);
 	}
 
 	inline unsigned short GetSpellJobNextNode(ASI::Pointer spelljobdata, unsigned short spelljobnode)   // [ebp+0x10]
@@ -188,5 +199,17 @@ namespace ASI
 	{
 		ASI::CallClassProc<0x664050, unsigned short>
 			(figuredata, figure_index, flags);
+	}
+
+	inline unsigned short CreateFigureAsSummon(ASI::Pointer figure_toolbox, unsigned short source_figure_index, unsigned short unit_id)
+	{
+		return ASI::CallClassFunc<0x7F0942, unsigned short, int, int>
+			(figure_toolbox, source_figure_index, unit_id);
+	}
+
+	inline void AddSpellEffect(ASI::Pointer figure_toolbox, unsigned short figure_index, unsigned short effect_index)
+	{
+		ASI::CallClassProc<0x7F0903, int, int>
+			(figure_toolbox, figure_index, effect_index);
 	}
 }

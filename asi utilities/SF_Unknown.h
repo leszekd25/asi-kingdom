@@ -117,5 +117,32 @@ namespace ASI
 	struct AreaEntityQuery
 	{
 		unsigned char data[68];
+
+
 	};
+
+
+	inline void SetArea(AreaEntityQuery& q, short x1, short y1, short x2, short y2)
+	{
+		ASI::CallClassProc<0x7A2120, short, short, short, short>
+			(q.data, 0, 0, 1023, 1023);
+	}		
+	
+	inline void BindEntityContainersToArea(AreaEntityQuery& q, ASI::Pointer p1, ASI::Pointer p2, ASI::Pointer p3)
+	{
+		ASI::CallClassProc<0x7A23E0, ASI::Pointer, ASI::Pointer, ASI::Pointer>
+			(q.data, p1, p2, p3);
+	}
+
+	inline void FindAllEntitiesInArea(AreaEntityQuery& q, unsigned int& pos, int radius)
+	{
+		ASI::CallClassProc<0x7A19E0, unsigned int&, int>
+			(q.data, pos, radius);  // area radius
+	}
+
+	inline unsigned short GetNextEntity(AreaEntityQuery& q)
+	{
+		return ASI::CallClassFunc<0x7A2250, unsigned short>
+			(q.data);
+	}
 }

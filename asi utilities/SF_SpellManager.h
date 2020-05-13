@@ -12,7 +12,7 @@ namespace ASI
 
 	inline unsigned int OffsetToSpell(int spell_index)
 	{
-		return 27 * spell_index + 86;
+		return 27 * spell_index + 0x56;
 	}
 
 	inline ASI::Pointer GetBuildingManager(SF_SpellManager* man)
@@ -108,6 +108,11 @@ namespace ASI
 	inline unsigned short& SpellXData(SF_SpellManager* man, int spell_index)
 	{
 		return *((unsigned short*)(man->data + OffsetToSpell(spell_index) + 22));
+	}
+
+	inline unsigned char& SpellUnk_25(SF_SpellManager* man, int spell_index)
+	{
+		return *((unsigned char*)(man->data + OffsetToSpell(spell_index) + 25));
 	}
 
 	inline unsigned char& SpellFlags(SF_SpellManager* man, int spell_index)
