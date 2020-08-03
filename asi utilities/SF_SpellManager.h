@@ -100,9 +100,20 @@ namespace ASI
 		return *((unsigned char*)(man->data + OffsetToSpell(spell_index) + 8));
 	}
 
+	inline int* SpellSourcePointer(SF_SpellManager* man, int spell_index)
+	{
+		return (int*)((unsigned int)(man->data) + OffsetToSpell(spell_index) + 8);
+	}
+
+	// spell target type
 	inline unsigned char& SpellParam4(SF_SpellManager* man, int spell_index)
 	{
 		return *((unsigned char*)(man->data + OffsetToSpell(spell_index) + 15));
+	}
+
+	inline int* SpellTargetPointer(SF_SpellManager* man, int spell_index)
+	{
+		return (int*)((unsigned int)(man->data) + OffsetToSpell(spell_index) + 15);
 	}
 
 	inline unsigned short& SpellXData(SF_SpellManager* man, int spell_index)

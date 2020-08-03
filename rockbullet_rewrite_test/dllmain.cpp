@@ -13,6 +13,9 @@
 #include "SF_GdEffect.h"
 
 int SPELL_MANAGER_HANDLE_SPELLS_ABSOLUTE;
+int SPELL_MANAGER_CAST_SPELL_HOOK_START;
+int SPELL_MANAGER_CAST_SPELL_HOOK_END;
+int SPELL_MANAGER_CAST_SPELL_JUMP_LOCATION;
 
 void __stdcall effect_ability_benefactions(int spell_index)
 {
@@ -4531,10 +4534,69 @@ void __stdcall effect_summon(int spell_index)
         else
         {
             ASI::GdEffect_VisualOnlyAddEx(spell_manager, spell_index, 3, 1, figure_index, 0, 0, 25, ASI::SF_Unk1(), ASI::SF_Unk1(1, figure_index, 0, 0));
+            // kill summoned unit
             ASI::CallClassProc<0x7EE9C6, unsigned int, unsigned int, unsigned int, unsigned int, unsigned int, unsigned int>
                 (ASI::GetUnknownPointer(spell_manager, 0x24), 0, figure_index, 0x7FFF, 1, 0, 0);
         }
     }
+}
+
+void __stdcall effect_short_lived_NEW(int spell_index)
+{
+    ASI::SF_SpellManager* spell_manager;
+    __asm mov spell_manager, ecx
+
+    unsigned char some_data[12];
+    for (int i = 0; i < 12; i++)
+        some_data[i] = 0xFF;
+
+    auto figure_index2 = ASI::SpellSource(spell_manager, spell_index);
+    auto figure_offset2 = figure_index2 * 691;
+
+    if (ASI::SpellParam4(spell_manager, spell_index) == 1)
+    {
+        auto figuredata = ASI::GetFigureManager(spell_manager);
+
+        ASI::SF_SpellData spell_data;
+        // get_spell_data
+        ASI::CallClassProc<0x5F7E30, ASI::SF_SpellData*, unsigned int>
+            (ASI::GetUnknownPointer(spell_manager, 0x3C), &spell_data, ASI::SpellID(spell_manager, spell_index));
+
+        if (figure_index2 != 0)
+        {
+            if (ASI::IsAlive(figuredata, figure_index2))
+            {
+                auto spell_xdata = ASI::SpellXData(spell_manager, spell_index);       // byte ptr one time, word ptr another
+                if (ASI::AddXData(ASI::GetXDataPointer(spell_manager), spell_xdata, 5, 1) == 1)
+                {
+                    ASI::SF_Unk1 params2;
+                    ASI::SF_Unk1 params4;
+                    ASI::CallClassProc<0x7B8C00, ASI::SF_Unk1*, int, unsigned int, ASI::SF_Unk1*>
+                        (spell_manager->data, &params2, spell_index, ASI::GetSpellParameter(spell_data, 3), &params4);
+
+                    //ASI::GdEffect_VisualOnlyAdd(spell_manager, spell_index, 3, 1, figure_index2, 0, 0, 150, params2);
+
+                    ASI::SpellToDoCount(spell_manager, spell_index) = ASI::GetSpellParameter(spell_data, 0) / 100;
+                    //ASI::SpellFlags(spell_manager, spell_index) |= 0x2;
+                    //figuredata[figure_offset2 + 0x16].AsRef<unsigned int>() |= 0x20;
+
+                    return;
+                }
+                else
+                {
+                    if (ASI::IsAlive(figuredata, figure_index2))
+                    {
+                        // kill self
+                        ASI::CallClassProc<0x7EE9C6, unsigned int, unsigned int, unsigned int, unsigned int, unsigned int, unsigned int>
+                            (ASI::GetUnknownPointer(spell_manager, 0x24), 0, figure_index2, 0x7FFF, 1, 0, 0);
+                    }
+                }
+            }
+        }
+    }
+end:
+    ASI::GdEffect_Remove(spell_manager, spell_index);
+    return;
 }
 
 
@@ -4562,10 +4624,10 @@ void __stdcall spell_manager_handle_spells()
             {
                 switch (ASI::SpellLine(spell_manager, spell_index))
                 {
-                case ASI::SL_ABILITY_BENEFACTIONS: ASI::CallAsClassProc<unsigned int>(effect_ability_benefactions, spell_manager, spell_index); break;//ASI::CallClassProc<0x7BC9D0, unsigned int>(spell_manager, spell_index); break;
-                case ASI::SL_ABILITY_BERSERK: ASI::CallAsClassProc<unsigned int>(effect_ability_berserk, spell_manager, spell_index); break;//ASI::CallClassProc<0x7BD040, unsigned int>(spell_manager, spell_index); break;
+                case ASI::SL_ABILITY_BENEFACTIONS: ASI::CallClassProc<0x7BC9D0, unsigned int>(spell_manager, spell_index); break; //ASI::CallAsClassProc<unsigned int>(effect_ability_benefactions, spell_manager, spell_index); break;//ASI::CallClassProc<0x7BC9D0, unsigned int>(spell_manager, spell_index); break;
+                case ASI::SL_ABILITY_BERSERK: ASI::CallClassProc<0x7BD040, unsigned int>(spell_manager, spell_index); break; //ASI::CallAsClassProc<unsigned int>(effect_ability_berserk, spell_manager, spell_index); break;//ASI::CallClassProc<0x7BD040, unsigned int>(spell_manager, spell_index); break;
                 case ASI::SL_ABILITY_BOONS: ASI::CallClassProc<0x7BD2B0, unsigned int>(spell_manager, spell_index); break;
-                case ASI::SL_ABILITY_CRITICAL_HITS: ASI::CallAsClassProc<unsigned int>(effect_ability_critical_hits, spell_manager, spell_index); break;//ASI::CallClassProc<0x7BD4C0, unsigned int>(spell_manager, spell_index); break;
+                case ASI::SL_ABILITY_CRITICAL_HITS: ASI::CallClassProc<0x7BD4C0, unsigned int>(spell_manager, spell_index); break; //ASI::CallAsClassProc<unsigned int>(effect_ability_critical_hits, spell_manager, spell_index); break;//ASI::CallClassProc<0x7BD4C0, unsigned int>(spell_manager, spell_index); break;
                 case ASI::SL_ABILITY_DURABILITY: ASI::CallClassProc<0x7BD710, unsigned int>(spell_manager, spell_index); break;
                 case ASI::SL_ABILITY_ENDURANCE: ASI::CallClassProc<0x7BD980, unsigned int>(spell_manager, spell_index); break;
                 case ASI::SL_ABILITY_PATRONIZE: ASI::CallClassProc<0x7BDE40, unsigned int>(spell_manager, spell_index); break;
@@ -4580,16 +4642,16 @@ void __stdcall spell_manager_handle_spells()
                 case ASI::SL_ALMIGHTNESS_BLACK: ASI::CallClassProc<0x7BFD60, unsigned int>(spell_manager, spell_index); break;
                 case ASI::SL_ALMIGHTNESS_ELEMENTAL : ASI::CallClassProc<0x7C0020, unsigned int>(spell_manager, spell_index); break;
                 case ASI::SL_ALMIGHTNESS_ELEMENTAL2: ASI::CallClassProc<0x7C0310, unsigned int>(spell_manager, spell_index); break;
-                case ASI::SL_ALMIGHTNESS_MENTAL: ASI::CallAsClassProc<unsigned int>(effect_almightness_mental, spell_manager, spell_index); break;//ASI::CallClassProc<0x7C06F0, unsigned int>(spell_manager, spell_index); break;
-                case ASI::SL_ALMIGHTNESS_WHITE: ASI::CallAsClassProc<unsigned int>(effect_almightness_white, spell_manager, spell_index); break; //ASI::CallClassProc<0x7C09F0, unsigned int>(spell_manager, spell_index); break;
+                case ASI::SL_ALMIGHTNESS_MENTAL: ASI::CallClassProc<0x7C06F0, unsigned int>(spell_manager, spell_index); break; //ASI::CallAsClassProc<unsigned int>(effect_almightness_mental, spell_manager, spell_index); break;//ASI::CallClassProc<0x7C06F0, unsigned int>(spell_manager, spell_index); break;
+                case ASI::SL_ALMIGHTNESS_WHITE: ASI::CallClassProc<0x7C09F0, unsigned int>(spell_manager, spell_index); break; //ASI::CallAsClassProc<unsigned int>(effect_almightness_white, spell_manager, spell_index); break; //ASI::CallClassProc<0x7C09F0, unsigned int>(spell_manager, spell_index); break;
                 case ASI::SL_AMOK: ASI::CallClassProc<0x7C0CB0, unsigned int>(spell_manager, spell_index); break;
                 case ASI::SL_ARROWTOWER: ASI::CallClassProc<0x7C0FA0, unsigned int>(spell_manager, spell_index); break;
                 case ASI::SL_DARKNESS_AREA: ASI::CallClassProc<0x7C1350, unsigned int>(spell_manager, spell_index); break;
                 case ASI::SL_ASSISTANCE: ASI::CallClassProc<0x7C17F0, unsigned int>(spell_manager, spell_index); break;
-                case ASI::SL_AURA: ASI::CallAsClassProc<unsigned int>(effect_aura, spell_manager, spell_index); break; //ASI::CallClassProc<0x7C1C50, unsigned int>(spell_manager, spell_index); break;
-                case ASI::SL_BEFRIEND: ASI::CallAsClassProc<unsigned int>(effect_befriend, spell_manager, spell_index); break; //ASI::CallClassProc<0x7C1A10, unsigned int>(spell_manager, spell_index); break;
+                case ASI::SL_AURA: ASI::CallClassProc<0x7C1C50, unsigned int>(spell_manager, spell_index); break; //ASI::CallAsClassProc<unsigned int>(effect_aura, spell_manager, spell_index); break; //ASI::CallClassProc<0x7C1C50, unsigned int>(spell_manager, spell_index); break;
+                case ASI::SL_BEFRIEND: ASI::CallClassProc<0x7C1A10, unsigned int>(spell_manager, spell_index); break; //ASI::CallAsClassProc<unsigned int>(effect_befriend, spell_manager, spell_index); break; //ASI::CallClassProc<0x7C1A10, unsigned int>(spell_manager, spell_index); break;
                 case ASI::SL_UNKNOWN1: ASI::CallClassProc<0x7C2AD0, unsigned int>(spell_manager, spell_index); break;
-                case ASI::SL_BLIZZARD: ASI::CallAsClassProc<unsigned int>(effect_blizzard, spell_manager, spell_index); break; //ASI::CallClassProc<0x7C2D40, unsigned int>(spell_manager, spell_index); break;
+                case ASI::SL_BLIZZARD: ASI::CallClassProc<0x7C2D40, unsigned int>(spell_manager, spell_index); break; //ASI::CallAsClassProc<unsigned int>(effect_blizzard, spell_manager, spell_index); break; //ASI::CallClassProc<0x7C2D40, unsigned int>(spell_manager, spell_index); break;
                 case ASI::SL_BRILLIANCE: ASI::CallClassProc<0x7C30A0, unsigned int>(spell_manager, spell_index); break;
                 case ASI::SL_CANNIBALIZE: ASI::CallClassProc<0x7C32B0, unsigned int>(spell_manager, spell_index); break;
                 case ASI::SL_CHARISMA: ASI::CallClassProc<0x7C3430, unsigned int>(spell_manager, spell_index); break;
@@ -4603,7 +4665,7 @@ void __stdcall spell_manager_handle_spells()
                 case ASI::SL_CURE_DISEASE: ASI::CallClassProc<0x7C5B90, unsigned int>(spell_manager, spell_index); break;
                 case ASI::SL_CURE_POISON: ASI::CallClassProc<0x7C5DC0, unsigned int>(spell_manager, spell_index); break;
                 case ASI::SL_DARK_BANISHING: ASI::CallClassProc<0x7C5FF0, unsigned int>(spell_manager, spell_index); break;
-                case ASI::SL_DEATH: ASI::CallAsClassProc<unsigned int>(effect_death, spell_manager, spell_index); break;
+                case ASI::SL_DEATH: ASI::CallClassProc<0x7C6270, unsigned int>(spell_manager, spell_index); break; //ASI::CallAsClassProc<unsigned int>(effect_death, spell_manager, spell_index); break;
                 case ASI::SL_DEATH_GRASP: ASI::CallClassProc<0x7C64D0, unsigned int>(spell_manager, spell_index); break;
                 case ASI::SL_DECAY: ASI::CallClassProc<0x7C6710, unsigned int>(spell_manager, spell_index); break;
                 case ASI::SL_DECAY2: ASI::CallClassProc<0x7C6980, unsigned int>(spell_manager, spell_index); break;
@@ -4637,10 +4699,10 @@ void __stdcall spell_manager_handle_spells()
                 case ASI::SL_FIREBALL1: ASI::CallClassProc<0x7CCD30, unsigned int>(spell_manager, spell_index); break;
                 case ASI::SL_FIREBALL2: ASI::CallClassProc<0x7CD010, unsigned int>(spell_manager, spell_index); break;
                 case ASI::SL_FIREBULLET: ASI::CallClassProc<0x7CD470, unsigned int>(spell_manager, spell_index); break;
-                case ASI::SL_FIREBURST: ASI::CallAsClassProc<unsigned int>(effect_fireburst, spell_manager, spell_index); break;//ASI::CallClassProc<0x7CD660, unsigned int>(spell_manager, spell_index); break;
+                case ASI::SL_FIREBURST: ASI::CallClassProc<0x7CD660, unsigned int>(spell_manager, spell_index); break; //ASI::CallAsClassProc<unsigned int>(effect_fireburst, spell_manager, spell_index); break;//ASI::CallClassProc<0x7CD660, unsigned int>(spell_manager, spell_index); break;
                 case ASI::SL_FIRE_RESISTANCE: ASI::CallClassProc<0x7CDB10, unsigned int>(spell_manager, spell_index); break;
                 case ASI::SL_FIRESHIELD1: ASI::CallClassProc<0x7CDD50, unsigned int>(spell_manager, spell_index); break;
-                case ASI::SL_FIRESHIELD2: ASI::CallAsClassProc<unsigned int>(effect_fireshield2, spell_manager, spell_index); break;//ASI::CallClassProc<0x7CDFB0, unsigned int>(spell_manager, spell_index); break;
+                case ASI::SL_FIRESHIELD2: ASI::CallClassProc<0x7CDFB0, unsigned int>(spell_manager, spell_index); break;//ASI::CallAsClassProc<unsigned int>(effect_fireshield2, spell_manager, spell_index); break;//ASI::CallClassProc<0x7CDFB0, unsigned int>(spell_manager, spell_index); break;
                 case ASI::SL_FLEXIBILITY: ASI::CallClassProc<0x7CE1A0, unsigned int>(spell_manager, spell_index); break;
                 case ASI::SL_FLEXIBILITY_AREA: ASI::CallClassProc<0x7CE400, unsigned int>(spell_manager, spell_index); break;
                 case ASI::SL_FOG: ASI::CallClassProc<0x7CE7F0, unsigned int>(spell_manager, spell_index); break;
@@ -4649,7 +4711,7 @@ void __stdcall spell_manager_handle_spells()
                 case ASI::SL_FREEZE_AREA: ASI::CallClassProc<0x7CF150, unsigned int>(spell_manager, spell_index); break;
                 case ASI::SL_GUARD: ASI::CallClassProc<0x7CF5D0, unsigned int>(spell_manager, spell_index); break;
                 case ASI::SL_HALLOW: ASI::CallClassProc<0x7CF780, unsigned int>(spell_manager, spell_index); break;
-                case ASI::SL_HEALING: ASI::CallAsClassProc<unsigned int>(effect_healing, spell_manager, spell_index); break;//ASI::CallClassProc<0x7CFCC0, unsigned int>(spell_manager, spell_index); break;
+                case ASI::SL_HEALING: ASI::CallClassProc<0x7CFCC0, unsigned int>(spell_manager, spell_index); break;//ASI::CallAsClassProc<unsigned int>(effect_healing, spell_manager, spell_index); break;//ASI::CallClassProc<0x7CFCC0, unsigned int>(spell_manager, spell_index); break;
                 case ASI::SL_UNKNOWN: ASI::CallClassProc<0x7CFED0, unsigned int>(spell_manager, spell_index); break;
                 case ASI::SL_HEALING_AREA: ASI::CallClassProc<0x7D0070, unsigned int>(spell_manager, spell_index); break;
                 case ASI::SL_HEALING_AURA: ASI::CallClassProc<0x7D04D0, unsigned int>(spell_manager, spell_index); break;
@@ -4659,7 +4721,7 @@ void __stdcall spell_manager_handle_spells()
                 case ASI::SL_HYPNOTIZE: ASI::CallClassProc<0x7D1420, unsigned int>(spell_manager, spell_index); break;
                 case ASI::SL_ICE1: ASI::CallClassProc<0x7D18E0, unsigned int>(spell_manager, spell_index); break;
                 case ASI::SL_ICE2: ASI::CallClassProc<0x7D1C50, unsigned int>(spell_manager, spell_index); break;
-                case ASI::SL_ICESTRIKE1:ASI::CallAsClassProc<unsigned int>(effect_icestrike1, spell_manager, spell_index); break;
+                case ASI::SL_ICESTRIKE1: ASI::CallClassProc<0x7D1FC0, unsigned int>(spell_manager, spell_index); break; //ASI::CallAsClassProc<unsigned int>(effect_icestrike1, spell_manager, spell_index); break;
                 case ASI::SL_ICESTRIKE2: ASI::CallClassProc<0x7D2540, unsigned int>(spell_manager, spell_index); break;
                 case ASI::SL_ICESHIELD2: ASI::CallClassProc<0x7D2A40, unsigned int>(spell_manager, spell_index); break;
                 case ASI::SL_ICESHIELD3: ASI::CallClassProc<0x7D2C90, unsigned int>(spell_manager, spell_index); break;
@@ -4683,7 +4745,7 @@ void __stdcall spell_manager_handle_spells()
                 case ASI::SL_PAIN_AREA: ASI::CallClassProc<0x7D6990, unsigned int>(spell_manager, spell_index); break;
                 case ASI::SL_PAIN_TOWER: ASI::CallClassProc<0x7D6DD0, unsigned int>(spell_manager, spell_index); break;
                 case ASI::SL_PESTILENCE: ASI::CallClassProc<0x7D6FE0, unsigned int>(spell_manager, spell_index); break;
-                case ASI::SL_PETRIFY: ASI::CallAsClassProc<unsigned int>(effect_petrify, spell_manager, spell_index); break;//ASI::CallClassProc<0x7D7420, unsigned int>(spell_manager, spell_index); break;
+                case ASI::SL_PETRIFY: ASI::CallClassProc<0x7D7420, unsigned int>(spell_manager, spell_index); break;//ASI::CallAsClassProc<unsigned int>(effect_petrify, spell_manager, spell_index); break;//
                 case ASI::SL_PLAGUE_AREA: ASI::CallClassProc<0x7D7740, unsigned int>(spell_manager, spell_index); break;
                 case ASI::SL_POISON: ASI::CallClassProc<0x7D7CC0, unsigned int>(spell_manager, spell_index); break;
                 case ASI::SL_CLOAK_OF_NOR: ASI::CallClassProc<0x7D8240, unsigned int>(spell_manager, spell_index); break;
@@ -4697,7 +4759,7 @@ void __stdcall spell_manager_handle_spells()
                 case ASI::SL_REMOVE_CURSE: ASI::CallClassProc<0x7D9D30, unsigned int>(spell_manager, spell_index); break;
                 case ASI::SL_RETENTION: ASI::CallClassProc<0x7D9F80, unsigned int>(spell_manager, spell_index); break;
                 case ASI::SL_REVENGE: ASI::CallClassProc<0x7DA190, unsigned int>(spell_manager, spell_index); break;
-                case ASI::SL_ROCK_BULLET: ASI::CallAsClassProc<unsigned int>(effect_rock_bullet, spell_manager, spell_index); break;
+                case ASI::SL_ROCK_BULLET: ASI::CallClassProc<0x7DA7F0, unsigned int>(spell_manager, spell_index); break; //ASI::CallAsClassProc<unsigned int>(effect_rock_bullet, spell_manager, spell_index); break;
                 case ASI::SL_ROOTS: ASI::CallClassProc<0x7DAC90, unsigned int>(spell_manager, spell_index); break;
                 case ASI::SL_ROOTS_AREA: ASI::CallClassProc<0x7DB130, unsigned int>(spell_manager, spell_index); break;
                 case ASI::SL_SACRIFICE_MANA: ASI::CallClassProc<0x7DB850, unsigned int>(spell_manager, spell_index); break;
@@ -4713,12 +4775,12 @@ void __stdcall spell_manager_handle_spells()
                 case ASI::SL_STONE: ASI::CallClassProc<0x7DDFD0, unsigned int>(spell_manager, spell_index); break;
                 case ASI::SL_STONE_RAIN: ASI::CallClassProc<0x7DE150, unsigned int>(spell_manager, spell_index); break;
                 case ASI::SL_STONE_TOWER: ASI::CallClassProc<0x7DE4B0, unsigned int>(spell_manager, spell_index); break;
-                case ASI::SL_STRENGTH: ASI::CallClassProc<0x7DE8A0, unsigned int>(spell_manager, spell_index); break;
-                case ASI::SL_STRENGTH_AREA: ASI::CallClassProc<0x7DEB00, unsigned int>(spell_manager, spell_index); break;
+                case ASI::SL_STRENGHT: ASI::CallClassProc<0x7DE8A0, unsigned int>(spell_manager, spell_index); break;
+                case ASI::SL_STRENGHT_AREA: ASI::CallClassProc<0x7DEB00, unsigned int>(spell_manager, spell_index); break;
                 case ASI::SL_SUFFOCATION: ASI::CallClassProc<0x7DEEE0, unsigned int>(spell_manager, spell_index); break;
                 case ASI::SL_SUICIDE_DEATH: ASI::CallClassProc<0x7DF130, unsigned int>(spell_manager, spell_index); break;
                 case ASI::SL_SUICIDE_HEAL: ASI::CallClassProc<0x7DF3A0, unsigned int>(spell_manager, spell_index); break;
-                case ASI::SL_SUMMON: ASI::CallAsClassProc<unsigned int>(effect_summon, spell_manager, spell_index); break;//ASI::CallClassProc<0x7DF5C0, unsigned int>(spell_manager, spell_index); break;
+                case ASI::SL_SUMMON: ASI::CallClassProc<0x7DF5C0, unsigned int>(spell_manager, spell_index); break; //ASI::CallAsClassProc<unsigned int>(effect_summon, spell_manager, spell_index); break;//
                 case ASI::SL_THORNSHIELD: ASI::CallClassProc<0x7DFD70, unsigned int>(spell_manager, spell_index); break;
                 case ASI::SL_THORNSHIELD_HIT: ASI::CallClassProc<0x7DFA30, unsigned int>(spell_manager, spell_index); break;
                 case ASI::SL_TORTURE: ASI::CallClassProc<0x7DFC10, unsigned int>(spell_manager, spell_index); break;
@@ -4741,6 +4803,1002 @@ void __stdcall spell_manager_handle_spells()
     }
 }
 
+
+// returns new spell effect index
+unsigned short __stdcall spell_manager_cast_spell(int spell_id, int time_delay_maybe, ASI::SF_Unk1* source_data, ASI::SF_Unk1* target_data, int unknown)
+{    // important
+    ASI::SF_SpellManager* spell_manager;
+    __asm mov spell_manager, ecx
+
+    if (target_data->c1 == 1)
+    {
+        if (ASI::CallClassFunc<0x7FA8F9, unsigned int, unsigned int>(ASI::GetUnknownPointer(spell_manager, 0x24), target_data->s1) == 0)
+            return 0;
+    }
+
+    // find a slot for new spell effect
+    unsigned short i;
+    for (i = 1; i < 800; i++)
+    {
+        if (ASI::SpellType(spell_manager, i) == 0)
+            break;
+    }
+    if(i == 800)
+        return 0;
+
+    if (i > ASI::SpellCount(spell_manager))
+        ASI::SpellCount(spell_manager) = i;
+
+
+    // initialize effect
+    ASI::SpellID(spell_manager, i) = (short)spell_id;
+    ASI::SpellType(spell_manager, i) = ASI::CallClassFunc<0x5F7F50, short, int>
+        (ASI::GetUnknownPointer(spell_manager, 0x3C), spell_id);
+
+    ASI::CallClassProc<0x7B8A20, ASI::SF_Unk1*>
+        (ASI::SpellSourcePointer(spell_manager, i), source_data);
+    ASI::CallClassProc<0x7B8A20, ASI::SF_Unk1*>
+        (ASI::SpellTargetPointer(spell_manager, i), target_data);
+
+    ASI::Pointer some_pointer1000 = ASI::GetUnknownPointer(spell_manager, 0x4);
+    auto some_value1002 = (unsigned int)some_pointer1000[0xC];
+
+    ASI::SpellToDoCount(spell_manager, i) = time_delay_maybe - some_value1002;
+
+    // spell-specific initialization
+    switch (ASI::SpellType(spell_manager, i))
+    {
+    case ASI::ST_SHIFT_LIFE:
+        ASI::SpellLine(spell_manager, i) = ASI::SL_ABILITY_SHIFT_LIFE;
+        break;
+    case ASI::ST_ALMIGHTNESS_ELEMENTAL:
+        ASI::SpellLine(spell_manager, i) = ASI::SL_ALMIGHTNESS_ELEMENTAL;
+        break;
+    case ASI::ST_ALMIGHTNESS_MENTAL:
+        ASI::SpellLine(spell_manager, i) = ASI::SL_ALMIGHTNESS_MENTAL;
+        break;
+    case ASI::ST_ARROWTOWER:
+        ASI::SpellLine(spell_manager, i) = ASI::SL_ARROWTOWER;
+        break;
+    // auras
+    case 88:
+    case 89:
+    case 91:
+    case 94:
+    case 95:
+    case 97:
+    case 98:
+    case 102:
+    case 103:
+    case 104:
+    case 107:
+    case 110:
+    case 111:
+    case 113:
+    case 114:
+    case 115:
+    case 127:
+    case 129:
+    case 131:
+    case 192:
+    case 223:
+    case 225:
+    case 226:
+    case 227:
+    case 228:
+        ASI::SpellLine(spell_manager, i) = ASI::SL_AURA;
+
+        ASI::XDataListAdd(ASI::GetXDataPointer(spell_manager), ASI::SpellXData(spell_manager, i), 5, 0);
+        ASI::XDataListAdd(ASI::GetXDataPointer(spell_manager), ASI::SpellXData(spell_manager, i), 6, 0);
+
+        break;
+    case ASI::ST_ALMIGHTNESS_ELEMENTAL2:
+        ASI::SpellLine(spell_manager, i) = ASI::SL_ALMIGHTNESS_ELEMENTAL2;
+
+        ASI::XDataListAdd(ASI::GetXDataPointer(spell_manager), ASI::SpellXData(spell_manager, i), 5, 0);
+        ASI::XDataListAdd(ASI::GetXDataPointer(spell_manager), ASI::SpellXData(spell_manager, i), 38, 0);
+
+        break;
+    case ASI::ST_BEFRIEND:
+        ASI::SpellLine(spell_manager, i) = ASI::SL_BEFRIEND;
+        break;
+    case ASI::ST_CANNIBALIZE:
+        ASI::SpellLine(spell_manager, i) = ASI::SL_CANNIBALIZE;
+        break;
+    case ASI::ST_CURE_DISEASE:
+        ASI::SpellLine(spell_manager, i) = ASI::SL_CURE_DISEASE;
+        break;
+    case ASI::ST_CURE_POISON:
+        ASI::SpellLine(spell_manager, i) = ASI::SL_CURE_POISON;
+        break;
+    case ASI::ST_DEATH:
+        ASI::SpellLine(spell_manager, i) = ASI::SL_DEATH;
+        break;
+    case ASI::ST_ESSENCE_ELEMENTAL2:
+        ASI::SpellLine(spell_manager, i) = ASI::SL_ESSENCE_ELEMENTAL2;
+
+        ASI::XDataListAdd(ASI::GetXDataPointer(spell_manager), ASI::SpellXData(spell_manager, i), 5, 0);
+        ASI::XDataListAdd(ASI::GetXDataPointer(spell_manager), ASI::SpellXData(spell_manager, i), 38, 0); 
+        
+        break;
+        // hallow
+    case 58:
+    case 230:
+        ASI::SpellLine(spell_manager, i) = ASI::SL_HALLOW;
+
+        ASI::XDataListAdd(ASI::GetXDataPointer(spell_manager), ASI::SpellXData(spell_manager, i), 5, 0);
+        ASI::XDataListAdd(ASI::GetXDataPointer(spell_manager), ASI::SpellXData(spell_manager, i), 38, 0);
+
+        break;
+    case ASI::ST_FIREBALL2:
+        ASI::SpellLine(spell_manager, i) = ASI::SL_FIREBALL2;
+
+        ASI::XDataListAdd(ASI::GetXDataPointer(spell_manager), ASI::SpellXData(spell_manager, i), 18, 0);
+        ASI::XDataListAdd(ASI::GetXDataPointer(spell_manager), ASI::SpellXData(spell_manager, i), 38, 0);
+
+        break;
+    case 1:
+    case 159:
+    case 234:
+        ASI::SpellLine(spell_manager, i) = ASI::SL_FIREBURST;
+
+        ASI::XDataListAdd(ASI::GetXDataPointer(spell_manager), ASI::SpellXData(spell_manager, i), 18, 0);
+        ASI::XDataListAdd(ASI::GetXDataPointer(spell_manager), ASI::SpellXData(spell_manager, i), 38, 0);
+
+        break;
+    case ASI::ST_DETECT_MAGIC:
+        ASI::SpellLine(spell_manager, i) = ASI::SL_DETECT_MAGIC;
+        break;
+    case ASI::ST_DETECT_METAL:
+        ASI::SpellLine(spell_manager, i) = ASI::SL_DETECT_METAL;
+        break;
+    case ASI::ST_DISENCHANT:
+        ASI::SpellLine(spell_manager, i) = ASI::SL_DISENCHANT;
+        break;
+    // icestrike
+    case 14:
+    case 235:
+        ASI::SpellLine(spell_manager, i) = ASI::SL_ICESTRIKE1;
+
+        ASI::XDataListAdd(ASI::GetXDataPointer(spell_manager), ASI::SpellXData(spell_manager, i), 5, 0);
+        ASI::XDataListAdd(ASI::GetXDataPointer(spell_manager), ASI::SpellXData(spell_manager, i), 18, 0);
+        ASI::XDataListAdd(ASI::GetXDataPointer(spell_manager), ASI::SpellXData(spell_manager, i), 38, 0);
+
+        break;
+    case ASI::ST_DEXTERITY:
+        ASI::SpellLine(spell_manager, i) = ASI::SL_DEXTERITY;
+
+        ASI::XDataListAdd(ASI::GetXDataPointer(spell_manager), ASI::SpellXData(spell_manager, i), 5, 0);
+        ASI::XDataListAdd(ASI::GetXDataPointer(spell_manager), ASI::SpellXData(spell_manager, i), 10, 0);
+
+        break;
+    case ASI::ST_ENDURANCE_EFFECT:
+        ASI::SpellLine(spell_manager, i) = ASI::SL_ENDURANCE;
+
+        ASI::XDataListAdd(ASI::GetXDataPointer(spell_manager), ASI::SpellXData(spell_manager, i), 5, 0);
+        ASI::XDataListAdd(ASI::GetXDataPointer(spell_manager), ASI::SpellXData(spell_manager, i), 10, 0);
+
+        break;
+    case ASI::ST_DISRUPT:
+        ASI::SpellLine(spell_manager, i) = ASI::SL_DISRUPT;
+        break;
+    case ASI::ST_DISTRACT:
+        ASI::SpellLine(spell_manager, i) = ASI::SL_DISTRACT;
+        break;
+    case ASI::ST_ENLIGHTENMENT:
+        ASI::SpellLine(spell_manager, i) = ASI::SL_ENLIGHTENMENT;
+
+        ASI::XDataListAdd(ASI::GetXDataPointer(spell_manager), ASI::SpellXData(spell_manager, i), 5, 0);
+        ASI::XDataListAdd(ASI::GetXDataPointer(spell_manager), ASI::SpellXData(spell_manager, i), 10, 0);
+        ASI::XDataListAdd(ASI::GetXDataPointer(spell_manager), ASI::SpellXData(spell_manager, i), 39, 0);
+
+        break;
+    case ASI::ST_FAST_FIGHTING:
+        ASI::SpellLine(spell_manager, i) = ASI::SL_FAST_FIGHTING;
+
+        ASI::XDataListAdd(ASI::GetXDataPointer(spell_manager), ASI::SpellXData(spell_manager, i), 5, 0);
+        ASI::XDataListAdd(ASI::GetXDataPointer(spell_manager), ASI::SpellXData(spell_manager, i), 10, 0);
+
+        break;
+    case ASI::ST_FLEXIBILITY:
+        ASI::SpellLine(spell_manager, i) = ASI::SL_FLEXIBILITY;
+
+        ASI::XDataListAdd(ASI::GetXDataPointer(spell_manager), ASI::SpellXData(spell_manager, i), 5, 0);
+        ASI::XDataListAdd(ASI::GetXDataPointer(spell_manager), ASI::SpellXData(spell_manager, i), 10, 0);
+
+        break;
+    case ASI::ST_ESSENCE_ELEMENTAL1:
+        ASI::SpellLine(spell_manager, i) = ASI::SL_ESSENCE_ELEMENTAL;
+        break;
+    case ASI::ST_ESSENCE_MENTAL:
+        ASI::SpellLine(spell_manager, i) = ASI::SL_ESSENCE_MENTAL;
+        break;
+    case ASI::ST_ETERNITY:
+        ASI::SpellLine(spell_manager, i) = ASI::SL_ETERNITY;
+
+        ASI::XDataListAdd(ASI::GetXDataPointer(spell_manager), ASI::SpellXData(spell_manager, i), 5, 0);
+        ASI::XDataListAdd(ASI::GetXDataPointer(spell_manager), ASI::SpellXData(spell_manager, i), 10, 0);
+        ASI::XDataListAdd(ASI::GetXDataPointer(spell_manager), ASI::SpellXData(spell_manager, i), 39, 0);
+        ASI::XDataListAdd(ASI::GetXDataPointer(spell_manager), ASI::SpellXData(spell_manager, i), 43, 0);
+        ASI::XDataListAdd(ASI::GetXDataPointer(spell_manager), ASI::SpellXData(spell_manager, i), 44, 0);
+
+        break;
+    case ASI::ST_EXTINCT:
+        ASI::SpellLine(spell_manager, i) = ASI::SL_EXTINCT;
+        break;
+    case ASI::ST_EXTINCT_TOWER:
+        ASI::SpellLine(spell_manager, i) = ASI::SL_EXTINCT_TOWER;
+        break;
+    case ASI::ST_FAKESPELLONEFIGURE:
+        ASI::SpellLine(spell_manager, i) = ASI::SL_FAKESPELLONEFIGURE;
+        break;
+        // fireball
+    case 13:
+    case 239:
+        ASI::SpellLine(spell_manager, i) = ASI::SL_FIREBALL1;
+        break;
+    case ASI::ST_LAVABULLET:
+        ASI::SpellLine(spell_manager, i) = ASI::SL_FIREBULLET;
+        break;
+    case ASI::ST_CONSERVATION:
+        ASI::SpellLine(spell_manager, i) = ASI::SL_CONSERVATION;
+
+
+        PROBLEM HERE!
+
+        ASI::XDataListAdd2(ASI::GetXDataPointer(spell_manager), ASI::SpellXData(spell_manager, i), 11, 0);
+        ASI::XDataListAdd2(ASI::GetXDataPointer(spell_manager), ASI::SpellXData(spell_manager, i), 5, 0);
+
+        break;
+    case ASI::ST_ESSENCE_BLACK:
+        ASI::SpellLine(spell_manager, i) = ASI::SL_ESSENCE_BLACK;
+
+        ASI::XDataListAdd(ASI::GetXDataPointer(spell_manager), ASI::SpellXData(spell_manager, i), 5, 0);
+
+        break;
+    case ASI::ST_FIRESHIELD2:
+        ASI::SpellLine(spell_manager, i) = ASI::SL_FIRESHIELD2;
+        break;
+    case ASI::ST_FORGET:
+        ASI::SpellLine(spell_manager, i) = ASI::SL_FORGET;
+        break;
+        // healing
+    case 2:
+    case 45:
+    case 166:
+        ASI::SpellLine(spell_manager, i) = ASI::SL_HEALING;
+        break;
+    case ASI::ST_HEAL_AREA:
+        ASI::SpellLine(spell_manager, i) = ASI::SL_HEALING_AREA;
+        break;
+    case ASI::ST_HEAL2:
+        ASI::SpellLine(spell_manager, i) = ASI::SL_HEALING_AURA;
+        break;
+    case ASI::ST_HOLY_TOUCH:
+        ASI::SpellLine(spell_manager, i) = ASI::SL_HOLY_TOUCH;
+        break;
+    case ASI::ST_ICESTRIKE2:
+        ASI::SpellLine(spell_manager, i) = ASI::SL_ICESTRIKE2;
+
+        ASI::XDataListAdd(ASI::GetXDataPointer(spell_manager), ASI::SpellXData(spell_manager, i), 5, 0);
+        ASI::XDataListAdd(ASI::GetXDataPointer(spell_manager), ASI::SpellXData(spell_manager, i), 18, 0);
+
+        break;
+    case ASI::ST_ICESHIELD2:
+        ASI::SpellLine(spell_manager, i) = ASI::SL_ICESHIELD2;
+
+        ASI::XDataListAdd(ASI::GetXDataPointer(spell_manager), ASI::SpellXData(spell_manager, i), 5, 0);
+
+        break;
+    case ASI::ST_BENEFACTIONS:
+        ASI::SpellLine(spell_manager, i) = ASI::SL_ABILITY_BENEFACTIONS;
+
+        ASI::XDataListAdd(ASI::GetXDataPointer(spell_manager), ASI::SpellXData(spell_manager, i), 5, 0);
+
+        break;
+    case ASI::ST_BERSERK:
+        ASI::SpellLine(spell_manager, i) = ASI::SL_ABILITY_BERSERK;
+
+        ASI::XDataListAdd(ASI::GetXDataPointer(spell_manager), ASI::SpellXData(spell_manager, i), 5, 0);
+
+        break;
+    case ASI::ST_BOONS:
+        ASI::SpellLine(spell_manager, i) = ASI::SL_ABILITY_BOONS;
+
+        ASI::XDataListAdd(ASI::GetXDataPointer(spell_manager), ASI::SpellXData(spell_manager, i), 5, 0);
+
+        break;
+    case ASI::ST_CRITICAL_HITS:
+        ASI::SpellLine(spell_manager, i) = ASI::SL_ABILITY_CRITICAL_HITS;
+
+        ASI::XDataListAdd(ASI::GetXDataPointer(spell_manager), ASI::SpellXData(spell_manager, i), 5, 0);
+
+        break;
+    case ASI::ST_DURABILITY:
+        ASI::SpellLine(spell_manager, i) = ASI::SL_ABILITY_DURABILITY;
+
+        ASI::XDataListAdd(ASI::GetXDataPointer(spell_manager), ASI::SpellXData(spell_manager, i), 5, 0);
+
+        break;
+    case ASI::ST_ENDURANCE:
+        ASI::SpellLine(spell_manager, i) = ASI::SL_ABILITY_ENDURANCE;
+
+        ASI::XDataListAdd(ASI::GetXDataPointer(spell_manager), ASI::SpellXData(spell_manager, i), 5, 0);
+
+        break;
+    case ASI::ST_PATRONIZE:
+        ASI::SpellLine(spell_manager, i) = ASI::SL_ABILITY_PATRONIZE;
+
+        ASI::XDataListAdd(ASI::GetXDataPointer(spell_manager), ASI::SpellXData(spell_manager, i), 5, 0);
+
+        break;
+    case ASI::ST_RIPOSTE:
+        ASI::SpellLine(spell_manager, i) = ASI::SL_ABILITY_RIPOSTE;
+
+        ASI::XDataListAdd(ASI::GetXDataPointer(spell_manager), ASI::SpellXData(spell_manager, i), 5, 0);
+
+        break;
+    case ASI::ST_SALVO:
+        ASI::SpellLine(spell_manager, i) = ASI::SL_ABILITY_SALVO;
+
+        ASI::XDataListAdd(ASI::GetXDataPointer(spell_manager), ASI::SpellXData(spell_manager, i), 5, 0);
+
+        break;
+    case ASI::ST_SHELTER:
+        ASI::SpellLine(spell_manager, i) = ASI::SL_ABILITY_SHELTER;
+
+        ASI::XDataListAdd(ASI::GetXDataPointer(spell_manager), ASI::SpellXData(spell_manager, i), 5, 0);
+
+        break;
+    case ASI::ST_STEELSKIN:
+        ASI::SpellLine(spell_manager, i) = ASI::SL_ABILITY_STEELSKIN;
+
+        ASI::XDataListAdd(ASI::GetXDataPointer(spell_manager), ASI::SpellXData(spell_manager, i), 5, 0);
+
+        break;
+    case ASI::ST_TRUESHOT:
+        ASI::SpellLine(spell_manager, i) = ASI::SL_ABILITY_TRUESHOT;
+
+        ASI::XDataListAdd(ASI::GetXDataPointer(spell_manager), ASI::SpellXData(spell_manager, i), 5, 0);
+
+        break;
+    case ASI::ST_WARCRY:
+        ASI::SpellLine(spell_manager, i) = ASI::SL_ABILITY_WARCRY;
+
+        ASI::XDataListAdd(ASI::GetXDataPointer(spell_manager), ASI::SpellXData(spell_manager, i), 5, 0);
+
+        break;
+    case ASI::ST_ACID_CLOUD:
+        ASI::SpellLine(spell_manager, i) = ASI::SL_ACID_CLOUD;
+
+        ASI::XDataListAdd(ASI::GetXDataPointer(spell_manager), ASI::SpellXData(spell_manager, i), 5, 0);
+
+        break;
+    case ASI::ST_ALMIGHTNESS_BLACK:
+        ASI::SpellLine(spell_manager, i) = ASI::SL_ALMIGHTNESS_BLACK;
+
+        ASI::XDataListAdd(ASI::GetXDataPointer(spell_manager), ASI::SpellXData(spell_manager, i), 5, 0);
+
+        break;
+    case ASI::ST_ALMIGHTNESS_WHITE:
+        ASI::SpellLine(spell_manager, i) = ASI::SL_ALMIGHTNESS_WHITE;
+
+        ASI::XDataListAdd(ASI::GetXDataPointer(spell_manager), ASI::SpellXData(spell_manager, i), 5, 0);
+
+        break;
+    case ASI::ST_AMOK:
+        ASI::SpellLine(spell_manager, i) = ASI::SL_AMOK;
+
+        ASI::XDataListAdd(ASI::GetXDataPointer(spell_manager), ASI::SpellXData(spell_manager, i), 5, 0);
+
+        break;
+    case ASI::ST_ASSISTANCE:
+        ASI::SpellLine(spell_manager, i) = ASI::SL_ASSISTANCE;
+
+        ASI::XDataListAdd(ASI::GetXDataPointer(spell_manager), ASI::SpellXData(spell_manager, i), 5, 0);
+
+        break;
+    case ASI::ST_UNK1:
+        ASI::SpellLine(spell_manager, i) = ASI::SL_UNKNOWN1;
+
+        ASI::XDataListAdd(ASI::GetXDataPointer(spell_manager), ASI::SpellXData(spell_manager, i), 5, 0);
+
+        break;
+    case ASI::ST_BLIZZARD:
+        ASI::SpellLine(spell_manager, i) = ASI::SL_BLIZZARD;
+
+        ASI::XDataListAdd(ASI::GetXDataPointer(spell_manager), ASI::SpellXData(spell_manager, i), 5, 0);
+
+        break;
+    case ASI::ST_BRILLIANCE:
+        ASI::SpellLine(spell_manager, i) = ASI::SL_BRILLIANCE;
+
+        ASI::XDataListAdd(ASI::GetXDataPointer(spell_manager), ASI::SpellXData(spell_manager, i), 5, 0);
+
+        break;
+    case 190:
+    case 193:
+    case 196:
+    case 201:
+    case 202:
+    case 204:
+    case 205:
+    case 208:
+    case 212:
+    case 214:
+    case 217:
+        ASI::SpellLine(spell_manager, i) = ASI::SL_CHAIN;
+
+        ASI::XDataListAdd(ASI::GetXDataPointer(spell_manager), ASI::SpellXData(spell_manager, i), 5, 0);
+
+        break;
+    case ASI::ST_CHARISMA:
+        ASI::SpellLine(spell_manager, i) = ASI::SL_CHARISMA;
+
+        ASI::XDataListAdd(ASI::GetXDataPointer(spell_manager), ASI::SpellXData(spell_manager, i), 5, 0);
+
+        break;
+    case 122:
+    case 237:
+        ASI::SpellLine(spell_manager, i) = ASI::SL_CHARM;
+
+        ASI::XDataListAdd(ASI::GetXDataPointer(spell_manager), ASI::SpellXData(spell_manager, i), 5, 0);
+
+        break;
+    case ASI::ST_CHARM_ANIMAL:
+        ASI::SpellLine(spell_manager, i) = ASI::SL_CHARM_ANIMAL;
+
+        ASI::XDataListAdd(ASI::GetXDataPointer(spell_manager), ASI::SpellXData(spell_manager, i), 5, 0);
+
+        break;
+    case ASI::ST_CHILL_RESISTANCE:
+        ASI::SpellLine(spell_manager, i) = ASI::SL_CHILL_RESISTANCE;
+
+        ASI::XDataListAdd(ASI::GetXDataPointer(spell_manager), ASI::SpellXData(spell_manager, i), 5, 0);
+
+        break;
+    case ASI::ST_CONFUSE:
+        ASI::SpellLine(spell_manager, i) = ASI::SL_CONFUSE;
+
+        ASI::XDataListAdd(ASI::GetXDataPointer(spell_manager), ASI::SpellXData(spell_manager, i), 5, 0);
+
+        break;
+    case ASI::ST_CONFUSE_AREA:
+        ASI::SpellLine(spell_manager, i) = ASI::SL_CONFUSE_AREA;
+
+        ASI::XDataListAdd(ASI::GetXDataPointer(spell_manager), ASI::SpellXData(spell_manager, i), 5, 0);
+
+        break;
+    case ASI::ST_DARK_BANISHING:
+        ASI::SpellLine(spell_manager, i) = ASI::SL_DARK_BANISHING;
+
+        ASI::XDataListAdd(ASI::GetXDataPointer(spell_manager), ASI::SpellXData(spell_manager, i), 5, 0);
+
+        break;
+    case ASI::ST_DARKNESS_AREA:
+        ASI::SpellLine(spell_manager, i) = ASI::SL_DARKNESS_AREA;
+
+        ASI::XDataListAdd(ASI::GetXDataPointer(spell_manager), ASI::SpellXData(spell_manager, i), 5, 0);
+
+        break;
+    case ASI::ST_DEATH_GRASP:
+        ASI::SpellLine(spell_manager, i) = ASI::SL_DEATH_GRASP;
+
+        ASI::XDataListAdd(ASI::GetXDataPointer(spell_manager), ASI::SpellXData(spell_manager, i), 5, 0);
+
+        break;
+    case ASI::ST_DECAY1:
+        ASI::SpellLine(spell_manager, i) = ASI::SL_DECAY;
+
+        ASI::XDataListAdd(ASI::GetXDataPointer(spell_manager), ASI::SpellXData(spell_manager, i), 5, 0);
+
+        break;
+    case ASI::ST_DECAY2:
+        ASI::SpellLine(spell_manager, i) = ASI::SL_DECAY2;
+
+        ASI::XDataListAdd(ASI::GetXDataPointer(spell_manager), ASI::SpellXData(spell_manager, i), 5, 0);
+
+        break;
+    case ASI::ST_DEMORALIZATION:
+        ASI::SpellLine(spell_manager, i) = ASI::SL_DEMORALIZATION;
+
+        ASI::XDataListAdd(ASI::GetXDataPointer(spell_manager), ASI::SpellXData(spell_manager, i), 5, 0);
+
+        break;
+    case ASI::ST_DISPEL_BLACK_AURA:
+        ASI::SpellLine(spell_manager, i) = ASI::SL_DISPEL_BLACK_AURA;
+
+        ASI::XDataListAdd(ASI::GetXDataPointer(spell_manager), ASI::SpellXData(spell_manager, i), 5, 0);
+
+        break;
+    case ASI::ST_DISPEL_WHITE_AURA:
+        ASI::SpellLine(spell_manager, i) = ASI::SL_DISPEL_WHITE_AURA;
+
+        ASI::XDataListAdd(ASI::GetXDataPointer(spell_manager), ASI::SpellXData(spell_manager, i), 5, 0);
+
+        break;
+    case ASI::ST_DOMINATE:
+        ASI::SpellLine(spell_manager, i) = ASI::SL_DOMINATE;
+
+        ASI::XDataListAdd(ASI::GetXDataPointer(spell_manager), ASI::SpellXData(spell_manager, i), 5, 0);
+
+        break;
+    case ASI::ST_DOMINATE_ANIMAL:
+        ASI::SpellLine(spell_manager, i) = ASI::SL_DOMINATE_ANIMAL;
+
+        ASI::XDataListAdd(ASI::GetXDataPointer(spell_manager), ASI::SpellXData(spell_manager, i), 5, 0);
+
+        break;
+    case ASI::ST_DOMINATE_UNDEAD:
+        ASI::SpellLine(spell_manager, i) = ASI::SL_DOMINATE_UNDEAD;
+
+        ASI::XDataListAdd(ASI::GetXDataPointer(spell_manager), ASI::SpellXData(spell_manager, i), 5, 0);
+
+        break;
+    case ASI::ST_UNK2:
+        ASI::SpellLine(spell_manager, i) = ASI::SL_DOMINATE_BREAK;
+
+        ASI::XDataListAdd(ASI::GetXDataPointer(spell_manager), ASI::SpellXData(spell_manager, i), 5, 0);
+
+        break;
+    case ASI::ST_ESSENCE_WHITE:
+        ASI::SpellLine(spell_manager, i) = ASI::SL_ESSENCE_WHITE;
+
+        ASI::XDataListAdd(ASI::GetXDataPointer(spell_manager), ASI::SpellXData(spell_manager, i), 5, 0);
+
+        break;
+    case ASI::ST_FEIGN_DEATH:
+        ASI::SpellLine(spell_manager, i) = ASI::SL_FEIGN_DEATH;
+
+        ASI::XDataListAdd(ASI::GetXDataPointer(spell_manager), ASI::SpellXData(spell_manager, i), 5, 0);
+
+        break;
+    case ASI::ST_FIRESHIELD:
+        ASI::SpellLine(spell_manager, i) = ASI::SL_FIRESHIELD1;
+
+        ASI::XDataListAdd(ASI::GetXDataPointer(spell_manager), ASI::SpellXData(spell_manager, i), 5, 0);
+
+        break;
+    case ASI::ST_FLEXIBILITY_AREA:
+        ASI::SpellLine(spell_manager, i) = ASI::SL_FLEXIBILITY_AREA;
+
+        ASI::XDataListAdd(ASI::GetXDataPointer(spell_manager), ASI::SpellXData(spell_manager, i), 5, 0);
+
+        break;
+    case ASI::ST_FOG:
+        ASI::SpellLine(spell_manager, i) = ASI::SL_FOG;
+
+        ASI::XDataListAdd(ASI::GetXDataPointer(spell_manager), ASI::SpellXData(spell_manager, i), 5, 0);
+
+        break;
+    case ASI::ST_FREEZE:
+        ASI::SpellLine(spell_manager, i) = ASI::SL_FREEZE;
+
+        ASI::XDataListAdd(ASI::GetXDataPointer(spell_manager), ASI::SpellXData(spell_manager, i), 5, 0);
+
+        break;
+    case ASI::ST_FREEZE_AREA:
+        ASI::SpellLine(spell_manager, i) = ASI::SL_FREEZE_AREA;
+
+        ASI::XDataListAdd(ASI::GetXDataPointer(spell_manager), ASI::SpellXData(spell_manager, i), 5, 0);
+
+        break;
+    case ASI::ST_GUARD:
+        ASI::SpellLine(spell_manager, i) = ASI::SL_GUARD;
+
+        ASI::XDataListAdd(ASI::GetXDataPointer(spell_manager), ASI::SpellXData(spell_manager, i), 5, 0);
+
+        break;
+    case 21:
+    case 167:
+        ASI::SpellLine(spell_manager, i) = ASI::SL_ICESHIELD;
+
+        ASI::XDataListAdd(ASI::GetXDataPointer(spell_manager), ASI::SpellXData(spell_manager, i), 5, 0);
+
+        break;
+    case ASI::ST_HYPNOTIZE_AREA:
+        ASI::SpellLine(spell_manager, i) = ASI::SL_HYPNOTIZE_AREA;
+
+        ASI::XDataListAdd(ASI::GetXDataPointer(spell_manager), ASI::SpellXData(spell_manager, i), 5, 0);
+
+        break;
+    case ASI::ST_HYPNOTIZE_TOWER:
+        ASI::SpellLine(spell_manager, i) = ASI::SL_HYPNOTIZE;
+
+        ASI::XDataListAdd(ASI::GetXDataPointer(spell_manager), ASI::SpellXData(spell_manager, i), 5, 0);
+
+        break;
+    case ASI::ST_FREEZE2:
+        ASI::SpellLine(spell_manager, i) = ASI::SL_ICE1;
+
+        ASI::XDataListAdd(ASI::GetXDataPointer(spell_manager), ASI::SpellXData(spell_manager, i), 5, 0);
+
+        break;
+    case ASI::ST_FREEZE3:
+        ASI::SpellLine(spell_manager, i) = ASI::SL_ICE2;
+
+        ASI::XDataListAdd(ASI::GetXDataPointer(spell_manager), ASI::SpellXData(spell_manager, i), 5, 0);
+
+        break;
+    case ASI::ST_MANASHIELD:
+        ASI::SpellLine(spell_manager, i) = ASI::SL_MANASHIELD;
+
+        ASI::XDataListAdd(ASI::GetXDataPointer(spell_manager), ASI::SpellXData(spell_manager, i), 5, 0);
+
+        break;
+    case ASI::ST_MELT_RESISTANCE:
+        ASI::SpellLine(spell_manager, i) = ASI::SL_MELT_RESISTANCE;
+
+        ASI::XDataListAdd(ASI::GetXDataPointer(spell_manager), ASI::SpellXData(spell_manager, i), 5, 0);
+
+        break;
+    case ASI::ST_MIRAGE:
+        ASI::SpellLine(spell_manager, i) = ASI::SL_MIRAGE;
+
+        ASI::XDataListAdd(ASI::GetXDataPointer(spell_manager), ASI::SpellXData(spell_manager, i), 5, 0);
+
+        break;
+    case ASI::ST_PETRIFY:
+        ASI::SpellLine(spell_manager, i) = ASI::SL_PETRIFY;
+
+        ASI::XDataListAdd(ASI::GetXDataPointer(spell_manager), ASI::SpellXData(spell_manager, i), 5, 0);
+
+        break;
+    case ASI::ST_CLOAK_OF_NOR:
+        ASI::SpellLine(spell_manager, i) = ASI::SL_CLOAK_OF_NOR;
+
+        ASI::XDataListAdd(ASI::GetXDataPointer(spell_manager), ASI::SpellXData(spell_manager, i), 5, 0);
+
+        break;
+    case ASI::ST_QUICKNESS_AREA:
+        ASI::SpellLine(spell_manager, i) = ASI::SL_QUICKNESS_AREA;
+
+        ASI::XDataListAdd(ASI::GetXDataPointer(spell_manager), ASI::SpellXData(spell_manager, i), 5, 0);
+
+        break;
+    case ASI::ST_RAIN_OF_FIRE:
+        ASI::SpellLine(spell_manager, i) = ASI::SL_RAIN_OF_FIRE;
+
+        ASI::XDataListAdd(ASI::GetXDataPointer(spell_manager), ASI::SpellXData(spell_manager, i), 5, 0);
+
+        break;
+    case ASI::ST_REGENERATE:
+        ASI::SpellLine(spell_manager, i) = ASI::SL_REGENERATE;
+
+        ASI::XDataListAdd(ASI::GetXDataPointer(spell_manager), ASI::SpellXData(spell_manager, i), 5, 0);
+
+        break;
+    case ASI::ST_REMEDILESS:
+        ASI::SpellLine(spell_manager, i) = ASI::SL_REMEDILESS;
+
+        ASI::XDataListAdd(ASI::GetXDataPointer(spell_manager), ASI::SpellXData(spell_manager, i), 5, 0);
+
+        break;
+    case ASI::ST_REMOVE_CURSE:
+        ASI::SpellLine(spell_manager, i) = ASI::SL_REMOVE_CURSE;
+
+        ASI::XDataListAdd(ASI::GetXDataPointer(spell_manager), ASI::SpellXData(spell_manager, i), 5, 0);
+
+        break;
+    case ASI::ST_RETENTION:
+        ASI::SpellLine(spell_manager, i) = ASI::SL_RETENTION;
+
+        ASI::XDataListAdd(ASI::GetXDataPointer(spell_manager), ASI::SpellXData(spell_manager, i), 5, 0);
+
+        break;
+    case ASI::ST_ROOTS:
+        ASI::SpellLine(spell_manager, i) = ASI::SL_ROOTS;
+
+        ASI::XDataListAdd(ASI::GetXDataPointer(spell_manager), ASI::SpellXData(spell_manager, i), 5, 0);
+
+        break;
+    case ASI::ST_ROOTS_AREA:
+        ASI::SpellLine(spell_manager, i) = ASI::SL_ROOTS_AREA;
+
+        ASI::XDataListAdd(ASI::GetXDataPointer(spell_manager), ASI::SpellXData(spell_manager, i), 5, 0);
+
+        break;
+    case ASI::ST_CLAY_FEET:
+        ASI::SpellLine(spell_manager, i) = ASI::SL_FEET_OF_CLAY;
+
+        ASI::XDataListAdd(ASI::GetXDataPointer(spell_manager), ASI::SpellXData(spell_manager, i), 5, 0);
+
+        break;
+    case ASI::ST_SELF_ILLUSION:
+        ASI::SpellLine(spell_manager, i) = ASI::SL_SELF_ILLUSION;
+
+        ASI::XDataListAdd(ASI::GetXDataPointer(spell_manager), ASI::SpellXData(spell_manager, i), 5, 0);
+
+        break;
+    case ASI::ST_SLOW_FIGHTING:
+        ASI::SpellLine(spell_manager, i) = ASI::SL_SLOW_FIGHTING;
+
+        ASI::XDataListAdd(ASI::GetXDataPointer(spell_manager), ASI::SpellXData(spell_manager, i), 5, 0);
+
+        break;
+    case ASI::ST_SLOWNESS:
+        ASI::SpellLine(spell_manager, i) = ASI::SL_SLOWNESS;
+
+        ASI::XDataListAdd(ASI::GetXDataPointer(spell_manager), ASI::SpellXData(spell_manager, i), 5, 0);
+
+        break;
+    case ASI::ST_SLOWNESS_AREA:
+        ASI::SpellLine(spell_manager, i) = ASI::SL_SLOWNESS_AREA;
+
+        ASI::XDataListAdd(ASI::GetXDataPointer(spell_manager), ASI::SpellXData(spell_manager, i), 5, 0);
+
+        break;
+    case ASI::ST_STONE_RAIN:
+        ASI::SpellLine(spell_manager, i) = ASI::SL_STONE_RAIN;
+
+        ASI::XDataListAdd(ASI::GetXDataPointer(spell_manager), ASI::SpellXData(spell_manager, i), 5, 0);
+
+        break;
+    case ASI::ST_STRENGHT_AREA:
+        ASI::SpellLine(spell_manager, i) = ASI::SL_STRENGHT_AREA;
+
+        ASI::XDataListAdd(ASI::GetXDataPointer(spell_manager), ASI::SpellXData(spell_manager, i), 5, 0);
+
+        break;
+    case ASI::ST_SUFFOCATION:
+        ASI::SpellLine(spell_manager, i) = ASI::SL_SUFFOCATION;
+
+        ASI::XDataListAdd(ASI::GetXDataPointer(spell_manager), ASI::SpellXData(spell_manager, i), 5, 0);
+
+        break;
+        // summon
+    case 20:
+    case 29:
+    case 31:
+    case 33:
+    case 92:
+    case 106:
+    case 109:
+    case 133:
+    case 136:
+    case 141:
+    case 188:
+    case 198:
+    case 203:
+    case 206:
+    case 209:
+        ASI::SpellLine(spell_manager, i) = ASI::SL_SUMMON;
+
+        ASI::XDataListAdd(ASI::GetXDataPointer(spell_manager), ASI::SpellXData(spell_manager, i), 5, 0);
+
+        break;
+    case ASI::ST_THORN_SHIELD:
+        ASI::SpellLine(spell_manager, i) = ASI::SL_THORNSHIELD;
+
+        ASI::XDataListAdd(ASI::GetXDataPointer(spell_manager), ASI::SpellXData(spell_manager, i), 5, 0);
+
+        break;
+    case ASI::ST_FEEDBACK:
+        ASI::SpellLine(spell_manager, i) = ASI::SL_FEEDBACK;
+
+        ASI::XDataListAdd(ASI::GetXDataPointer(spell_manager), ASI::SpellXData(spell_manager, i), 5, 0);
+
+        break;
+    case ASI::ST_WEAKEN:
+        ASI::SpellLine(spell_manager, i) = ASI::SL_WEAKEN;
+
+        ASI::XDataListAdd(ASI::GetXDataPointer(spell_manager), ASI::SpellXData(spell_manager, i), 5, 0);
+
+        break;
+    case ASI::ST_WEAKEN_AREA:
+        ASI::SpellLine(spell_manager, i) = ASI::SL_WEAKEN_AREA;
+
+        ASI::XDataListAdd(ASI::GetXDataPointer(spell_manager), ASI::SpellXData(spell_manager, i), 5, 0);
+
+        break;
+    case ASI::ST_ICESHIELD:
+        ASI::SpellLine(spell_manager, i) = ASI::SL_ICESHIELD3;
+
+        ASI::XDataListAdd(ASI::GetXDataPointer(spell_manager), ASI::SpellXData(spell_manager, i), 5, 0);
+
+        break;
+    case ASI::ST_LIFETAP_AURA:
+        ASI::SpellLine(spell_manager, i) = ASI::SL_LIFETAP_AURA;
+        break;
+    case ASI::ST_MANADRAIN:
+        ASI::SpellLine(spell_manager, i) = ASI::SL_MANADRAIN;
+        break;
+    case 67:
+    case 232:
+        ASI::SpellLine(spell_manager, i) = ASI::SL_MANATAP;
+        break;
+    case ASI::ST_MANATAP_AURA:
+        ASI::SpellLine(spell_manager, i) = ASI::SL_MANATAP_AURA;
+        break;
+    case ASI::ST_MEDITATION:
+        ASI::SpellLine(spell_manager, i) = ASI::SL_MEDITATION;
+        break;
+    case 18:
+    case 240:
+        ASI::SpellLine(spell_manager, i) = ASI::SL_PAIN;
+        break;
+    case ASI::ST_PAIN_AREA:
+        ASI::SpellLine(spell_manager, i) = ASI::SL_PAIN_AREA;
+        break;
+    case ASI::ST_PAIN_TOWER:
+        ASI::SpellLine(spell_manager, i) = ASI::SL_PAIN_TOWER;
+        break;
+    case ASI::ST_RAISE_DEAD:
+        ASI::SpellLine(spell_manager, i) = ASI::SL_RAISE_DEAD;
+        break;
+    case ASI::ST_REINFORCEMENT:
+        ASI::SpellLine(spell_manager, i) = ASI::SL_REINFORCEMENT;
+        break;
+    case ASI::ST_REVENGE:
+        ASI::SpellLine(spell_manager, i) = ASI::SL_REVENGE;
+        break;
+    case ASI::ST_SACRIFICE_MANA:
+        ASI::SpellLine(spell_manager, i) = ASI::SL_SACRIFICE_MANA;
+        break;
+    case ASI::ST_SHIFT_MANA:
+        ASI::SpellLine(spell_manager, i) = ASI::SL_SHIFT_MANA;
+        break;
+        // shock
+    case 69:
+    case 238:
+        ASI::SpellLine(spell_manager, i) = ASI::SL_SHOCK;
+        break;
+    case ASI::ST_SHOCKWAVE:
+        ASI::SpellLine(spell_manager, i) = ASI::SL_SHOCKWAVE;
+        break;
+    case ASI::ST_SENTINEL_HEAL:
+        ASI::SpellLine(spell_manager, i) = ASI::SL_SENTINEL_HEALING;
+        break;
+    case ASI::ST_SPARK:
+        ASI::SpellLine(spell_manager, i) = ASI::SL_SPARK;
+        break;
+    case ASI::ST_STONE:
+        ASI::SpellLine(spell_manager, i) = ASI::SL_STONE;
+        break;
+    case ASI::ST_STONE_TOWER:
+        ASI::SpellLine(spell_manager, i) = ASI::SL_STONE_TOWER;
+        break;
+    case ASI::ST_SUICIDE_DEATH:
+        ASI::SpellLine(spell_manager, i) = ASI::SL_SUICIDE_DEATH;
+        break;
+    case ASI::ST_SUICIDE_HEAL:
+        ASI::SpellLine(spell_manager, i) = ASI::SL_SUICIDE_HEAL;
+        break;
+    case ASI::ST_THORNS:
+        ASI::SpellLine(spell_manager, i) = ASI::SL_THORNSHIELD_HIT;
+        break;
+    case ASI::ST_TORTURE:
+        ASI::SpellLine(spell_manager, i) = ASI::SL_TORTURE;
+        break;
+        // lifetap
+    case 19:
+    case 231:
+        ASI::SpellLine(spell_manager, i) = ASI::SL_LIFETAP;
+
+        ASI::XDataListAdd2(ASI::GetXDataPointer(spell_manager), ASI::SpellXData(spell_manager, i), 38, 0);
+
+        break;
+        // mutation
+    case 199:
+    case 233:
+        ASI::SpellLine(spell_manager, i) = ASI::SL_MUTATION;
+
+        ASI::XDataListAdd2(ASI::GetXDataPointer(spell_manager), ASI::SpellXData(spell_manager, i), 5, 0);
+        ASI::XDataListAdd2(ASI::GetXDataPointer(spell_manager), ASI::SpellXData(spell_manager, i), 10, 0);
+        ASI::XDataListAdd2(ASI::GetXDataPointer(spell_manager), ASI::SpellXData(spell_manager, i), 39, 0);
+        ASI::XDataListAdd2(ASI::GetXDataPointer(spell_manager), ASI::SpellXData(spell_manager, i), 43, 0);
+        ASI::XDataListAdd2(ASI::GetXDataPointer(spell_manager), ASI::SpellXData(spell_manager, i), 44, 0);
+
+        break;   
+    case ASI::ST_PESTILENCE:
+        ASI::SpellLine(spell_manager, i) = ASI::SL_PESTILENCE;
+
+        ASI::XDataListAdd2(ASI::GetXDataPointer(spell_manager), ASI::SpellXData(spell_manager, i), 5, 0);
+        ASI::XDataListAdd2(ASI::GetXDataPointer(spell_manager), ASI::SpellXData(spell_manager, i), 14, 0);
+        ASI::XDataListAdd2(ASI::GetXDataPointer(spell_manager), ASI::SpellXData(spell_manager, i), 38, 0);
+
+        break;
+    case ASI::ST_PLAGUE_AREA:
+        ASI::SpellLine(spell_manager, i) = ASI::SL_PLAGUE_AREA;
+
+        ASI::XDataListAdd2(ASI::GetXDataPointer(spell_manager), ASI::SpellXData(spell_manager, i), 5, 0);
+        ASI::XDataListAdd2(ASI::GetXDataPointer(spell_manager), ASI::SpellXData(spell_manager, i), 38, 0);
+
+        break;
+    case ASI::ST_POISON:
+        ASI::SpellLine(spell_manager, i) = ASI::SL_POISON;
+
+        ASI::XDataListAdd2(ASI::GetXDataPointer(spell_manager), ASI::SpellXData(spell_manager, i), 18, 0);
+        ASI::XDataListAdd2(ASI::GetXDataPointer(spell_manager), ASI::SpellXData(spell_manager, i), 38, 0);
+
+        break;
+    case ASI::ST_QUICKNESS:
+        ASI::SpellLine(spell_manager, i) = ASI::SL_QUICKNESS;
+
+        ASI::XDataListAdd2(ASI::GetXDataPointer(spell_manager), ASI::SpellXData(spell_manager, i), 5, 0);
+        ASI::XDataListAdd2(ASI::GetXDataPointer(spell_manager), ASI::SpellXData(spell_manager, i), 10, 0);
+
+        break;
+        // rock bullet
+    case 139:
+    case 236:
+        ASI::SpellLine(spell_manager, i) = ASI::SL_ROCK_BULLET;
+
+        ASI::XDataListAdd2(ASI::GetXDataPointer(spell_manager), ASI::SpellXData(spell_manager, i), 45, (short)unknown);
+
+        break;
+    case ASI::ST_STRENGHT:
+        ASI::SpellLine(spell_manager, i) = ASI::SL_STRENGHT;
+
+        ASI::XDataListAdd2(ASI::GetXDataPointer(spell_manager), ASI::SpellXData(spell_manager, i), 5, (short)unknown);
+        ASI::XDataListAdd2(ASI::GetXDataPointer(spell_manager), ASI::SpellXData(spell_manager, i), 10, (short)unknown);
+
+        break;
+        // waves
+    case 134:
+    case 137:
+    case 142:
+        ASI::SpellLine(spell_manager, i) = ASI::SL_WAVE;
+
+        ASI::XDataListAdd2(ASI::GetXDataPointer(spell_manager), ASI::SpellXData(spell_manager, i), 5, (short)unknown);
+        ASI::XDataListAdd2(ASI::GetXDataPointer(spell_manager), ASI::SpellXData(spell_manager, i), 6, (short)unknown);
+
+        break;
+    case ASI::ST_ILLUMINATE:
+        ASI::SpellLine(spell_manager, i) = ASI::SL_ILLUMINATE;
+
+        ASI::XDataListAdd(ASI::GetXDataPointer(spell_manager), ASI::SpellXData(spell_manager, i), 5, 0);
+
+        break;
+    case ASI::ST_INABILITY:
+        ASI::SpellLine(spell_manager, i) = ASI::SL_INABILITY;
+
+        ASI::XDataListAdd(ASI::GetXDataPointer(spell_manager), ASI::SpellXData(spell_manager, i), 5, 0);
+
+        break;
+    case ASI::ST_INFLEXIBILITY:
+        ASI::SpellLine(spell_manager, i) = ASI::SL_INFLEXIBILITY;
+
+        ASI::XDataListAdd(ASI::GetXDataPointer(spell_manager), ASI::SpellXData(spell_manager, i), 5, 0);
+
+        break;
+    case ASI::ST_INFLEXIBILITY_AREA:
+        ASI::SpellLine(spell_manager, i) = ASI::SL_INFLEXIBILITY_AREA;
+
+        ASI::XDataListAdd(ASI::GetXDataPointer(spell_manager), ASI::SpellXData(spell_manager, i), 5, 0);
+
+        break;
+    case ASI::ST_INVISIBILITY:
+        ASI::SpellLine(spell_manager, i) = ASI::SL_INVISIBILITY;
+
+        ASI::XDataListAdd(ASI::GetXDataPointer(spell_manager), ASI::SpellXData(spell_manager, i), 5, 0);
+
+        break;
+    case ASI::ST_INVULNERABILITY:
+        ASI::SpellLine(spell_manager, i) = ASI::SL_INVULNERABILITY;
+
+        ASI::XDataListAdd(ASI::GetXDataPointer(spell_manager), ASI::SpellXData(spell_manager, i), 5, 0);
+
+        break;
+    default:
+        break;
+    }
+
+
+    // unknown???
+    if (target_data->c1 == 1)
+    {
+        if (ASI::SpellType(spell_manager, i) != 90)
+        {
+            //GdFigure::AddSpellEffect
+            ASI::CallClassProc<0x7F0903, int, int>
+                (ASI::GetUnknownPointer(spell_manager, 0x24), target_data->s1, i);
+        }
+    }
+
+    return i;
+}
+
 // hook here is required (?), because we need to jump near - replacing call to far function takes 6 bytes, while jump to relative is still 4 bytes :)
 void __declspec(naked) spell_manager_handle_spells_hook()
 {
@@ -4748,6 +5806,25 @@ void __declspec(naked) spell_manager_handle_spells_hook()
     {
         call spell_manager_handle_spells
         jmp SPELL_MANAGER_HANDLE_SPELLS_ABSOLUTE
+    }
+}
+
+void __declspec(naked) spell_manager_cast_spell_hook()
+{
+    __asm
+    {
+        mov eax, [esp+0x14]
+        push eax
+        mov eax, [esp+0x14]
+        push eax
+        mov eax, [esp+0x14]
+        push eax
+        mov eax, [esp+0x14]
+        push eax
+        mov eax, [esp+0x14]
+        push eax
+        call spell_manager_cast_spell
+        jmp SPELL_MANAGER_CAST_SPELL_JUMP_LOCATION
     }
 }
 
@@ -4766,13 +5843,21 @@ BOOL APIENTRY DllMain( HMODULE hModule,
             return FALSE;
 
         SPELL_MANAGER_HANDLE_SPELLS_ABSOLUTE = ASI::AddrOf(0x1B3365);
+        SPELL_MANAGER_CAST_SPELL_JUMP_LOCATION = ASI::AddrOf(0x3B84EA);
 
         ASI::MemoryRegion mreg(ASI::AddrOf(0x1B3360), 5);
+        ASI::MemoryRegion mreg2(ASI::AddrOf(0x3B7580), 5);
 
         ASI::BeginRewrite(mreg);
         *(unsigned char*)(ASI::AddrOf(0x1B3360)) = 0xE9;   // absolute far jmp instruction, call opcode
         *(int*)(ASI::AddrOf(0x1B3361)) = (int)(&spell_manager_handle_spells_hook) - ASI::AddrOf(0x1B3365);
         ASI::EndRewrite(mreg);
+
+
+        ASI::BeginRewrite(mreg2);
+        *(unsigned char*)(ASI::AddrOf(0x3B7580)) = 0xE9;   // absolute far jmp instruction, call opcode
+        *(int*)(ASI::AddrOf(0x3B7581)) = (int)(&spell_manager_cast_spell_hook) - ASI::AddrOf(0x3B7585);
+        ASI::EndRewrite(mreg2);
     }
         break;
     case DLL_PROCESS_DETACH:
