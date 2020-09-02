@@ -87,6 +87,7 @@ namespace ASI
 
 	const int GAME_BASE = 0x400000;              // start of game code, above this is probably stack?
 	const int WINDOW_OFFSET = 0x97CB5C;          // pointer to game window is statically allocated in game exe under address GAME_BASE + WINDOW_OFFSET
+	const int APPMAIN_OFFSET = 0x9644D0;         // pointer to appmain, the entire game starts from this position in exe
 	 
 	bool BeginRewrite(MemoryRegion& mem_region);
 	bool EndRewrite(MemoryRegion& mem_region);
