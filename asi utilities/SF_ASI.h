@@ -84,6 +84,21 @@ namespace ASI
 		}
 	};
 
+	class FakeStack
+	{
+	public:
+		FakeStack() { data = 0; size = 0; }
+		FakeStack(int _size) { data = new char[_size]; size = _size; }
+		~FakeStack() { if (data != 0) delete[] data; }
+		ASI::Pointer operator[](int offset)
+		{
+			return ASI::Pointer(data + (size - offset));
+		}
+	private:
+		char* data;
+		int size;
+	};
+
 
 	const int GAME_BASE = 0x400000;              // start of game code, above this is probably stack?
 	const int WINDOW_OFFSET = 0x97CB5C;          // pointer to game window is statically allocated in game exe under address GAME_BASE + WINDOW_OFFSET
@@ -135,6 +150,18 @@ namespace ASI
 	inline Result CallClassFunc(ASI::Pointer _this, Args... vals)
 	{
 		return ((Result(__thiscall*)(void*, Args...))(Addr))(_this.ptr, vals...);
+	}
+
+	template<unsigned int Offset, typename ... Args>
+	inline void CallClassVirtualProc(ASI::Pointer _this, Args... vals)
+	{
+		((void(__thiscall*)(void*, Args...))(*((*_this)[Offset])))(_this.ptr, vals...);
+	}
+
+	template<unsigned int Offset, typename Result, typename ... Args>
+	inline Result CallClassVirtualFunc(ASI::Pointer _this, Args... vals)
+	{
+		return ((Result(__thiscall*)(void*, Args...))(*((*_this)[Offset])))(_this.ptr, vals...);
 	}
 
 	template<typename ... Args>

@@ -4803,7 +4803,7 @@ void __stdcall spell_manager_handle_spells()
     }
 }
 
-
+/*
 // returns new spell effect index
 unsigned short __stdcall spell_manager_cast_spell(int spell_id, int time_delay_maybe, ASI::SF_Unk1* source_data, ASI::SF_Unk1* target_data, int unknown)
 {    // important
@@ -5798,6 +5798,7 @@ unsigned short __stdcall spell_manager_cast_spell(int spell_id, int time_delay_m
 
     return i;
 }
+*/
 
 // hook here is required (?), because we need to jump near - replacing call to far function takes 6 bytes, while jump to relative is still 4 bytes :)
 void __declspec(naked) spell_manager_handle_spells_hook()
@@ -5809,6 +5810,7 @@ void __declspec(naked) spell_manager_handle_spells_hook()
     }
 }
 
+/*
 void __declspec(naked) spell_manager_cast_spell_hook()
 {
     __asm
@@ -5827,6 +5829,7 @@ void __declspec(naked) spell_manager_cast_spell_hook()
         jmp SPELL_MANAGER_CAST_SPELL_JUMP_LOCATION
     }
 }
+*/
 
 BOOL APIENTRY DllMain( HMODULE hModule,
                        DWORD  ul_reason_for_call,
@@ -5854,10 +5857,10 @@ BOOL APIENTRY DllMain( HMODULE hModule,
         ASI::EndRewrite(mreg);
 
 
-        ASI::BeginRewrite(mreg2);
+        /*ASI::BeginRewrite(mreg2);
         *(unsigned char*)(ASI::AddrOf(0x3B7580)) = 0xE9;   // absolute far jmp instruction, call opcode
         *(int*)(ASI::AddrOf(0x3B7581)) = (int)(&spell_manager_cast_spell_hook) - ASI::AddrOf(0x3B7585);
-        ASI::EndRewrite(mreg2);
+        ASI::EndRewrite(mreg2);*/
     }
         break;
     case DLL_PROCESS_DETACH:

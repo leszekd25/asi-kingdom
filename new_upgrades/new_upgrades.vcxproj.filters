@@ -23,5 +23,8 @@
     <ClInclude Include="ui_unit_icons.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="ui_unit_descriptions.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>
