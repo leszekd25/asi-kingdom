@@ -225,7 +225,7 @@ BOOL APIENTRY DllMain( HMODULE hModule,
             return FALSE;
         if (!InitializeUnitIconsData())
             return FALSE;
-        if(!InitializeUnitDescriptionsData())
+        if (!InitializeUnitDescriptionsData())
 
         UPGRADE_EXEC_ABSOLUTE = ASI::AddrOf(0x25B1A2);
         POST_INIT_EXEC_ABSOLUTE = ASI::AddrOf(0x00F558);
