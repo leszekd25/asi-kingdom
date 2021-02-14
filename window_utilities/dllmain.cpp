@@ -22,26 +22,38 @@ BOOL APIENTRY DllMain(HMODULE hModule,
 		if (!ASI::CheckSFVersion(ASI::SF_154))
 			return FALSE;
 
+		// make window not pause on tab out
+		ASI::MemoryRegion mreg_windowproc(ASI::AddrOf(0x0AD600), 0x810);
+
 		game_window = *(HWND*)(ASI::AddrOf(ASI::WINDOW_OFFSET));
 
-		//ASI::MemoryRegion mreg(ASI::AddrOf(0x0AD7DA), 10);
-		//ASI::MemoryRegion mreg2(ASI::AddrOf(0x0AD963), 13);
-		ASI::MemoryRegion mreg3(ASI::AddrOf(0x906DDC), 4);
+		ASI::BeginRewrite(mreg_windowproc);
+		// make it so the cursor is no longer clipped
+		*(unsigned char*)(ASI::AddrOf(0x0AD710)) = 0x58;
+		*(unsigned char*)(ASI::AddrOf(0x0AD711)) = 0x90;
+		*(unsigned char*)(ASI::AddrOf(0x0AD712)) = 0x90;
+		*(unsigned char*)(ASI::AddrOf(0x0AD713)) = 0x90;
+		*(unsigned char*)(ASI::AddrOf(0x0AD714)) = 0x90;
+		*(unsigned char*)(ASI::AddrOf(0x0AD715)) = 0x90;
 
-		//ASI::BeginRewrite(mreg);
-		//*(int*)(ASI::AddrOf(0x0AD7E0)) = 0x0000001;
-		//ASI::EndRewrite(mreg);
+		// skip allocating/deallocating OS resources when activating/deactivating window
+		*(unsigned char*)(ASI::AddrOf(0x0AD946)) = 0xE9;
+		*(unsigned char*)(ASI::AddrOf(0x0AD947)) = 0xDC;
+		*(unsigned char*)(ASI::AddrOf(0x0AD948)) = 0xFD;
+		*(unsigned char*)(ASI::AddrOf(0x0AD949)) = 0xFF;
+		*(unsigned char*)(ASI::AddrOf(0x0AD94A)) = 0xFF;
 
-		/*ASI::BeginRewrite(mreg2);
-		*(int*)(ASI::AddrOf(0x0AD963)) = 0x9090905A;
-		*(int*)(ASI::AddrOf(0x0AD967)) = 0x90909090;
-		*(int*)(ASI::AddrOf(0x0AD96B)) = 0x90909090;
-		*(unsigned char*)(ASI::AddrOf(0x0AD96F)) = 0x90;
-		ASI::EndRewrite(mreg2);*/
+		*(unsigned char*)(ASI::AddrOf(0x0AD9F5)) = 0x01;
 
-		ASI::BeginRewrite(mreg3);
-		*(int*)(ASI::AddrOf(0x906DDC)) = 0x00000000;
-		ASI::EndRewrite(mreg3);
+		*(unsigned char*)(ASI::AddrOf(0x0AD9F9)) = 0xE9;
+		*(unsigned char*)(ASI::AddrOf(0x0AD9FA)) = 0x2F;
+		*(unsigned char*)(ASI::AddrOf(0x0AD9FB)) = 0xFD;
+		*(unsigned char*)(ASI::AddrOf(0x0AD9FC)) = 0xFF;
+		*(unsigned char*)(ASI::AddrOf(0x0AD9FD)) = 0xFF;
+
+		// todo: work out why mouse stops properly working when the window is minimized or alt-tabbed
+
+		ASI::EndRewrite(mreg_windowproc);
 	}
 	break;
 	case DLL_PROCESS_DETACH:

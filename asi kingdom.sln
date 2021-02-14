@@ -13,6 +13,8 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "window_utilities", "window_
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "new_upgrades", "new_upgrades\new_upgrades.vcxproj", "{9D10563B-096E-4050-BF52-0A2D9A5DF716}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "fast_forward_cutscenes", "fast_forward_cutscenes\fast_forward_cutscenes.vcxproj", "{8C6E4318-8A72-460D-9912-99F056F4650C}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|x64 = Debug|x64
@@ -61,6 +63,14 @@ Global
 		{9D10563B-096E-4050-BF52-0A2D9A5DF716}.Release|x64.Build.0 = Release|x64
 		{9D10563B-096E-4050-BF52-0A2D9A5DF716}.Release|x86.ActiveCfg = Release|Win32
 		{9D10563B-096E-4050-BF52-0A2D9A5DF716}.Release|x86.Build.0 = Release|Win32
+		{8C6E4318-8A72-460D-9912-99F056F4650C}.Debug|x64.ActiveCfg = Debug|x64
+		{8C6E4318-8A72-460D-9912-99F056F4650C}.Debug|x64.Build.0 = Debug|x64
+		{8C6E4318-8A72-460D-9912-99F056F4650C}.Debug|x86.ActiveCfg = Debug|Win32
+		{8C6E4318-8A72-460D-9912-99F056F4650C}.Debug|x86.Build.0 = Debug|Win32
+		{8C6E4318-8A72-460D-9912-99F056F4650C}.Release|x64.ActiveCfg = Release|x64
+		{8C6E4318-8A72-460D-9912-99F056F4650C}.Release|x64.Build.0 = Release|x64
+		{8C6E4318-8A72-460D-9912-99F056F4650C}.Release|x86.ActiveCfg = Release|Win32
+		{8C6E4318-8A72-460D-9912-99F056F4650C}.Release|x86.Build.0 = Release|Win32
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

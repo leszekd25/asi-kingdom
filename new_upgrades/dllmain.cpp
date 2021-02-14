@@ -2,22 +2,33 @@
 
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
-#include <string>
+#include <cstring>
 #include <fstream>
-#include <unordered_map>
+//#include <unordered_map>
 #include <vector>
 #include <tuple>
 #include "SF_ASI.h"
 #include "SF_UTL_String.h"
 #include "ui_unit_icons.h"
 #include "ui_unit_descriptions.h"
+#include "upgrade_tree.h"
 
 int UPGRADE_EXEC_ABSOLUTE;
+
+int UPGRADE_UI_CHECK_EXEC_ABSOLUTE;
+int UPGRADE_UI_CHECK_FAIL_ABSOLUTE;
+
+int UPGRADE_CHECK_FAIL_ABSOLUTE;
+int UPGRADE_CHECK_EXEC_ABSOLUTE;
+
 int POST_INIT_EXEC_ABSOLUTE;
 
+HWND game_window;
+
 // unit upgrade data (unit id, (upgrade id, upgraded unit id))
-std::unordered_map<unsigned short, std::pair<int, unsigned short>> unit_upgrade_data;
+//std::unordered_map<unsigned short, std::pair<int, unsigned short>> unit_upgrade_data; 
 char max_upgrade_index = 54;          // base in game
+upgrade_graph upg_G;
 
 // unit icon data
 ASI::UiUnitIconInfo* unit_icons = 0;
@@ -30,6 +41,38 @@ unsigned short max_ui_description_index = 48;
 
 int MAX_BUILDING_INDEX = 64000;
 
+// returns if upgrade started learning OR if it was learned
+inline int upgrade_started_learning(ASI::Pointer caller, void* unk_ptr, int upgrade_id)
+{
+    return ASI::CallClassFunc<0x641EE0, unsigned int, void*, int>
+        (caller, unk_ptr, upgrade_id);
+}
+
+// returns if upgrade was learned
+inline int is_upgrade_activated(ASI::Pointer caller, void* unk_ptr, int upgrade_id)
+{
+    return ASI::CallClassFunc<0x641F70, unsigned int, void*, int>
+        (caller, unk_ptr, upgrade_id);
+}
+
+// returns if predecessor upgrade is learned (if any) and if exclusive upgrade is not learned (if any)
+int __stdcall upgrade_can_be_learned(ASI::Pointer caller, void* unk_ptr, int upgrade_id)
+{
+    int upg2;
+
+    // check if previous upgrade is learned
+    if (upg_G.prev_of(upgrade_id, upg2))
+        if (!is_upgrade_activated(caller, unk_ptr, upg2))
+            return 0;
+
+    // check if exclusive upgrade is not learned
+    if (upg_G.get_exclusive(upgrade_id, upg2))
+        if (is_upgrade_activated(caller, unk_ptr, upg2))
+            return 0;
+
+    return 1;
+}
+
 void __stdcall get_upgraded_unit_variant_id(ASI::Pointer unknown, ASI::Pointer unit_data)
 {
     ASI::Pointer stack_pointer(0);
@@ -37,16 +80,75 @@ void __stdcall get_upgraded_unit_variant_id(ASI::Pointer unknown, ASI::Pointer u
     __asm mov stack_pointer.ptr, esp
     __asm mov __this.ptr, ecx
 
+
     unsigned short unit_id = (unsigned short)(unit_data[0x0]);
-    std::unordered_map<unsigned short, std::pair<int, unsigned short>>::const_iterator uud_val = unit_upgrade_data.find(unit_id);
-    if (uud_val != unit_upgrade_data.end())
+    unsigned short upgraded_unit_id = unit_id;
+    unsigned short iter_unit_id;
+    unsigned short iter_upgraded_unit_id;
+
+    for (int i = 0; i <= max_upgrade_index; i++)
     {
-        if (ASI::CallClassFunc<0x641F70, unsigned int, void*, int>
-            ((*__this[0x48]), unknown.ptr, (*uud_val).second.first))
-            (unit_data[0x0]).AsRef<unsigned short>() = (*uud_val).second.second;
+        for (int j = 0; upg_G.get_unit(i, j, iter_unit_id, iter_upgraded_unit_id); j++)
+        {
+            if (iter_unit_id == unit_id)
+            {
+                if (is_upgrade_activated((*__this[0x48]), unknown.ptr, i))
+                {
+                    upgraded_unit_id = iter_upgraded_unit_id;
+                }
+            }
+        }
     }
 
+    (unit_data[0x0]).AsRef<unsigned short>() = upgraded_unit_id;
+
+    /*std::unordered_map<unsigned short, std::pair<int, unsigned short>>::const_iterator uud_val = unit_upgrade_data.find(unit_id);
+    if (uud_val != unit_upgrade_data.end())
+    {
+        if(is_upgrade_activated((*__this[0x48]), unknown.ptr, (*uud_val).second.first))
+            (unit_data[0x0]).AsRef<unsigned short>() = (*uud_val).second.second;
+    }*/
+
     return;
+}
+
+void __declspec(naked) check_can_upgrade_hook()
+{
+    __asm
+    {
+        push esi
+        push ebp
+        push ecx
+        call upgrade_can_be_learned
+        test eax, eax
+        jz fail
+        mov edx, [esp + 0xDC]
+        jmp UPGRADE_CHECK_EXEC_ABSOLUTE
+        fail :
+        jmp UPGRADE_CHECK_FAIL_ABSOLUTE
+    }
+}
+
+void __declspec(naked) ui_check_can_upgrade_hook()
+{
+    __asm
+    {
+        mov edx, [esp+0x24]
+        mov ecx, [esp+0x20]
+        mov ax, [ebx+edx]
+        push eax
+        push ecx
+        mov ecx, [edi+0x37C]
+        push ecx
+        call upgrade_can_be_learned
+        test eax, eax
+        jz fail
+        mov edx, [esp+0x24]
+        lea eax, [ebx+edx]
+        jmp UPGRADE_UI_CHECK_EXEC_ABSOLUTE
+        fail:
+        jmp UPGRADE_UI_CHECK_FAIL_ABSOLUTE
+    }
 }
 
 void __declspec(naked) get_upgraded_unit_variant_id_hook()
@@ -101,8 +203,83 @@ void __declspec(naked) post_init_modifications_hook()
     }
 }
 
+struct upgrade_line
+{
+    int command_type;
+    int upgrade_id1;
+    unsigned short unit_base_id;
+    unsigned short unit_upgrade_id;
+    int upgrade_id2;
+};
 
-bool InitializeUnitUpgradeData()
+// returns if successfully read
+template<class T>
+bool readint(char* str, int& index, T& result)
+{
+    result = 0;
+
+    int start_index = index;
+    for (; index < 64; index++)
+    {
+        if ((str[index] == ' ') || (str[index] == '\0'))
+            break;
+    }
+
+    int mul = 1;
+    for (int i = index-1; i >= start_index; i--)
+    {
+        result += (str[i]-'0') * mul;
+        mul *= 10;
+    }
+
+    index += 1;
+
+    return true;
+}
+
+// returns if command was successfully parsed
+bool parse_upgrade_command(char* str, upgrade_line* upgl)
+{
+    int index = 0;
+    for (; index < 64; index++)
+    {
+        if ((str[index] == ' ')||(str[index] == '\0'))
+            break;
+    }
+
+    char command[16];
+    for (int i = 0; i < 15; i++)
+        command[i] = str[i];
+    command[index] = '\0';
+    command[15] = '0';
+
+    index += 1;
+    if (strcmp(command, "upgrade") == 0)
+    {
+        upgl->command_type = 0;
+        if (!readint<int>(str, index, upgl->upgrade_id1)) return false;
+        if (!readint<unsigned short>(str, index, upgl->unit_base_id)) return false;
+        if (!readint<unsigned short>(str, index, upgl->unit_upgrade_id)) return false;
+    }
+    else if (strcmp(command, "chain") == 0)
+    {
+        upgl->command_type = 1;
+        if (!readint<int>(str, index, upgl->upgrade_id1)) return false;
+        if (!readint<int>(str, index, upgl->upgrade_id2)) return false;
+    }
+    else if (strcmp(command, "exclusive") == 0)
+    {
+        upgl->command_type = 2;
+        if (!readint<int>(str, index, upgl->upgrade_id1)) return false;
+        if (!readint<int>(str, index, upgl->upgrade_id2)) return false;
+    }
+    else
+        upgl->command_type = -1;
+
+    return true;
+}
+
+/*bool InitializeUnitUpgradeData()
 {
     std::fstream myfile("upgrades_config", std::ios_base::in);
     if (!myfile.is_open())
@@ -128,6 +305,109 @@ bool InitializeUnitUpgradeData()
 
     if (!myfile.eof())
     return false;
+
+    myfile.close();
+
+    return true;
+}
+*/
+
+bool InitializeUnitUpgradeData()
+{
+    char message[100];
+
+    std::fstream myfile("upgrades_config", std::ios_base::in);
+    if (!myfile.is_open())
+    {
+        sprintf_s(message, 80, "Could not open config file");
+        MessageBoxA(game_window, message, "New upgrades message", MB_OK);
+        return false;
+    }
+
+    upgrade_line upg_l;
+
+    char line[64];
+
+    int MAX_G_SIZE = 256;
+    upg_G.init(MAX_G_SIZE);
+    // parse upgrade file
+
+    int line_c = 1;
+    while (!myfile.fail())
+    {
+        myfile.getline(line, 64);
+        if (!parse_upgrade_command(line, &upg_l))
+        {
+            sprintf_s(message, 100, "Could not read from file (line %i)", line_c);
+            MessageBoxA(game_window, message, "New upgrades message", MB_OK);
+            myfile.close();
+            return false;
+        }
+
+        switch (upg_l.command_type)
+        {
+        case -1:  // no command
+        {
+            break;
+        }
+        case 0:   // "upgrade"
+        {
+            if (!upg_G.add(upg_l.upgrade_id1, upg_l.unit_base_id, upg_l.unit_upgrade_id))
+            {
+                sprintf_s(message, 100, "Could not add upgrade %i (units %hi, %hi) (line %i)", upg_l.upgrade_id1, upg_l.unit_base_id, upg_l.unit_upgrade_id, line_c);
+                MessageBoxA(game_window, message, "New upgrades message", MB_OK);
+                myfile.close();
+                return false;
+            }
+
+            if (upg_l.upgrade_id1 > max_upgrade_index)
+                max_upgrade_index = upg_l.upgrade_id1;
+            if (MAX_G_SIZE <= upg_l.upgrade_id1)
+            {
+                myfile.close();
+                return false;
+            }
+
+            break;
+        }
+        case 1:   // "chain"
+        {
+            if (!upg_G.chain(upg_l.upgrade_id1, upg_l.upgrade_id2))
+            {
+                sprintf_s(message, 100, "Could not chain upgrade %i with %i (line %i)", upg_l.upgrade_id1, upg_l.upgrade_id2, line_c);
+                MessageBoxA(game_window, message, "New upgrades message", MB_OK);
+                myfile.close();
+                return false;
+            }
+            break;
+        }
+        case 2:   // "exclusive"
+        {
+            if (!upg_G.exclude(upg_l.upgrade_id1, upg_l.upgrade_id2))
+            {
+                sprintf_s(message, 100, "Could not exclude upgrade %i from %i (line %i)", upg_l.upgrade_id1, upg_l.upgrade_id2, line_c);
+                MessageBoxA(game_window, message, "New upgrades message", MB_OK);
+                myfile.close();
+                return false;
+            }
+            break;
+        }
+        default:
+        {
+            myfile.close();
+            return false;
+        }
+        }
+        line_c += 1;
+    }
+
+    if (!myfile.eof())
+    {
+        sprintf_s(message, 100, "Error reading file");
+        MessageBoxA(game_window, message, "New upgrades message", MB_OK);
+        myfile.close();
+        return false;
+    }
 
     myfile.close();
 
@@ -221,13 +501,20 @@ BOOL APIENTRY DllMain( HMODULE hModule,
         if (!ASI::CheckSFVersion(ASI::SF_154))
             return FALSE;
 
+        game_window = *(HWND*)(ASI::AddrOf(ASI::WINDOW_OFFSET));
+
         if (!InitializeUnitUpgradeData())
             return FALSE;
         if (!InitializeUnitIconsData())
             return FALSE;
         if (!InitializeUnitDescriptionsData())
+            return FALSE;
 
         UPGRADE_EXEC_ABSOLUTE = ASI::AddrOf(0x25B1A2);
+        UPGRADE_CHECK_FAIL_ABSOLUTE = ASI::AddrOf(0x3E16FA);
+        UPGRADE_CHECK_EXEC_ABSOLUTE = ASI::AddrOf(0x3E15A9);
+        UPGRADE_UI_CHECK_FAIL_ABSOLUTE = ASI::AddrOf(0x639DE7);
+        UPGRADE_UI_CHECK_EXEC_ABSOLUTE = ASI::AddrOf(0x639D95);
         POST_INIT_EXEC_ABSOLUTE = ASI::AddrOf(0x00F558);
 
         ASI::MemoryRegion mreg(ASI::AddrOf(0x25B19D), 5);
@@ -236,6 +523,8 @@ BOOL APIENTRY DllMain( HMODULE hModule,
         ASI::MemoryRegion mreg4(ASI::AddrOf(0x4359CD), 2);
         ASI::MemoryRegion mreg5(ASI::AddrOf(0x1F9258), 2);
         ASI::MemoryRegion mreg6(ASI::AddrOf(0x51BB09), 9);
+        ASI::MemoryRegion mreg_check_upg(ASI::AddrOf(0x3E15A2), 7);
+        ASI::MemoryRegion mreg_ui_check_upg(ASI::AddrOf(0x639D8E), 7);
 
         ASI::MemoryRegion post_init_mreg(ASI::AddrOf(0x00F551), 7);
 
@@ -244,13 +533,29 @@ BOOL APIENTRY DllMain( HMODULE hModule,
         // replace original get_upgraded_unit_variant_id with forged variant
         ASI::BeginRewrite(mreg);
         *(unsigned char*)(ASI::AddrOf(0x25B19D)) = 0xE9;   // jmp instruction
-        *(int*)(ASI::AddrOf(0x25B19E)) = (int)(&get_upgraded_unit_variant_id_hook) - ASI::AddrOf(0x25B1A2);  // not D9, DE - skip one instruction?
+        *(int*)(ASI::AddrOf(0x25B19E)) = (int)(&get_upgraded_unit_variant_id_hook) - ASI::AddrOf(0x25B1A2);
         ASI::EndRewrite(mreg);
 
         // replace max upgrade index constant
         ASI::BeginRewrite(mreg2);
         *(unsigned char*)(ASI::AddrOf(0x63A1D3)) = (char)(max_upgrade_index+1);
         ASI::EndRewrite(mreg2);
+
+        // inject special upgrade check
+        ASI::BeginRewrite(mreg_check_upg);
+        *(unsigned char*)(ASI::AddrOf(0x3E15A2)) = 0xE9;   // jmp instruction
+        *(int*)(ASI::AddrOf(0x3E15A3)) = (int)(&check_can_upgrade_hook) - ASI::AddrOf(0x3E15A7);
+        *(unsigned char*)(ASI::AddrOf(0x3E15A7)) = 0x90;   // nop instruction
+        *(unsigned char*)(ASI::AddrOf(0x3E15A8)) = 0x90;   // nop instruction
+        ASI::EndRewrite(mreg_check_upg);
+
+        // inject special ui upgrade check
+        ASI::BeginRewrite(mreg_ui_check_upg);
+        *(unsigned char*)(ASI::AddrOf(0x639D8E)) = 0xE9;   // jmp instruction
+        *(int*)(ASI::AddrOf(0x639D8F)) = (int)(&ui_check_can_upgrade_hook) - ASI::AddrOf(0x639D93);
+        *(unsigned char*)(ASI::AddrOf(0x639D93)) = 0x90;   // nop instruction
+        *(unsigned char*)(ASI::AddrOf(0x639D94)) = 0x90;   // nop instruction
+        ASI::EndRewrite(mreg_ui_check_upg);
 
         // replace ui unit icon data
         ASI::BeginRewrite(mreg3);
@@ -261,13 +566,13 @@ BOOL APIENTRY DllMain( HMODULE hModule,
         // replace ui unit description data
         ASI::BeginRewrite(mreg6);
         *(int*)(ASI::AddrOf(0x51BB09)) = (int)(unit_descriptions) + 4;               // offset is necessary here
-        *(int*)(ASI::AddrOf(0x51B90D)) = max_ui_description_index;
+        *(int*)(ASI::AddrOf(0x51BB0E)) = max_ui_description_index;
         ASI::EndRewrite(mreg6);
 
         // hook into init routine at the end, to reload cache based on replaced data
         ASI::BeginRewrite(post_init_mreg);
         *(unsigned char*)(ASI::AddrOf(0x00F551)) = 0xE9;   // jmp instruction
-        *(int*)(ASI::AddrOf(0x00F552)) = (int)(&post_init_modifications_hook) - ASI::AddrOf(0x00F556);  // not D9, DE - skip one instruction?
+        *(int*)(ASI::AddrOf(0x00F552)) = (int)(&post_init_modifications_hook) - ASI::AddrOf(0x00F556); 
         ASI::EndRewrite(post_init_mreg);
 
         // THESE DO NOT WORK BECAUSE THEY'RE NOT UPDATED UNTIL AFTER USED
@@ -284,6 +589,8 @@ BOOL APIENTRY DllMain( HMODULE hModule,
     case DLL_PROCESS_DETACH:
         if (unit_icons != 0)
             delete[] unit_icons;
+        if (unit_descriptions != 0)
+            delete[] unit_descriptions;
         break;
     }
     return TRUE;
